@@ -12,7 +12,7 @@
   get_request_token/2,
   get_authorization_url/2,
   get_access_token/2,
-  set_access_token/3]).
+  set_access_token/2]).
 
 start_link(Consumer, Options) ->
   gen_oauth:start_link(Consumer, Options).
@@ -34,8 +34,8 @@ get_access_token(Pid, VerifierPin) ->
   Url = "https://twitter.com/oauth/access_token",
   gen_oauth:get_access_token(Pid, Url, VerifierPin).
 
-set_access_token(Pid, Token, Secret) ->
-  gen_oauth:set_access_token(Pid, Token, Secret).
+set_access_token(Pid, Access) ->
+  gen_oauth:set_access_token(Pid, Access).
 
 
 

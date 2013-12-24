@@ -7,16 +7,19 @@
 %% then it is unnecessary to go through the whole process. Instead, the
 %% access token just needs to be loaded and used for requests.
 %%
+%% For rest queries, one instance would be required for each user. Perhaps
+%% in the future this will change, but it might be good to leave it this
+%% way since it limits the number of synchronous requests available to a user.
 %% @author Brian Lee Yung Rowe
 -module(gen_oauth).
 -behaviour(gen_fsm).
 -export([behaviour_info/1]).
--export([start_link/2, start_link/3,
+-export([start_link/1, start_link/2,
   get_request_token/3,
   get_authorization_url/3,
   get_access_token/3,
-  set_access_token/3,
-  set_consumer_credentials/2,
+  set_access_token/2,
+  set_consumer_key/2,
   set_stream_handler/2,
   http_get/3,
   http_post/3,
@@ -24,7 +27,8 @@
 ]).
 
 %% FSM states
--export([started/3,
+-export([started/2,
+  consumer_set/3,
   consumer_okay/3,
   pending_verification/3,
   authenticated/2, authenticated/3
@@ -47,49 +51,52 @@ behaviour_info(callbacks) ->
    {get_request_token,2},
    {get_authorization_url,2},
    {get_access_token,2},
-   {set_access_token,3}].
+   {set_access_token,2}].
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PUBLIC API %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-start_link(Consumer, Options) ->
-  gen_fsm:start_link(?MODULE, Consumer, Options).
+start_link(Options) ->
+  gen_fsm:start_link(?MODULE, [], Options).
 
-start_link(ServerName, Consumer, Options) ->
-  gen_fsm:start_link(ServerName, ?MODULE, Consumer, Options).
-
-
-get_request_token(Pid, Url, Params) ->
-  gen_fsm:sync_send_event(Pid, {get_request_token, Url, Params}).
+start_link(ServerName, Options) ->
+  gen_fsm:start_link(ServerName, ?MODULE, [], Options).
 
 
-get_authorization_url(Pid, Url, Token) ->
-  gen_fsm:sync_send_event(Pid, {get_authorization_url, Url, Token}).
+get_request_token(ServerRef, Url, Params) ->
+  gen_fsm:sync_send_event(ServerRef, {get_request_token, Url, Params}).
 
 
-get_access_token(Pid, Url, VerifierPin) ->
-  gen_fsm:sync_send_event(Pid, {get_access_token, Url, VerifierPin}).
+get_authorization_url(ServerRef, Url, Token) ->
+  gen_fsm:sync_send_event(ServerRef, {get_authorization_url, Url, Token}).
 
-set_access_token(Pid, Token, Secret) ->
-  gen_fsm:sync_send_event(Pid, {set_access_token, Token, Secret}).
 
-set_consumer_credentials(_Pid, _Consumer) ->
+get_access_token(ServerRef, Url, VerifierPin) ->
+  gen_fsm:sync_send_event(ServerRef, {get_access_token, Url, VerifierPin}).
+
+set_access_token(ServerRef, Access) ->
+  gen_fsm:sync_send_event(ServerRef, {set_access_token, Access}).
+
+set_consumer_key(ServerRef, Consumer) ->
+  gen_fsm:send_event(ServerRef, {set_consumer_key, Consumer}).
+
+set_stream_handler(_ServerRef, _Handler) ->
   not_implemented.
 
-set_stream_handler(_Pid, _Handler) ->
-  not_implemented.
+http_get(ServerRef, Url, Params) ->
+  gen_fsm:sync_send_event(ServerRef, {http_get, Url, Params}).
 
-http_get(Pid, Url, Params) ->
-  gen_fsm:sync_send_event(Pid, {http_get, Url, Params}).
+http_post(ServerRef, Url, Params) ->
+  gen_fsm:sync_send_event(ServerRef, {http_post, Url, Params}).
 
-http_post(Pid, Url, Params) ->
-  gen_fsm:sync_send_event(Pid, {http_post, Url, Params}).
-
-http_stream(Pid, Url, Params, Callback) ->
-  gen_fsm:send_event(Pid, {http_stream, Url, Params, Callback}).
+http_stream(ServerRef, Url, Params, Callback) ->
+  gen_fsm:send_event(ServerRef, {http_stream, Url, Params, Callback}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% STATES %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-started({get_request_token, Url, Params}, _From, State) ->
+started({set_consumer_key, Consumer}, State) ->
+  {next_state, consumer_set, State#state{consumer=Consumer}}.
+
+consumer_set({get_request_token, Url, Params}, _From, State) ->
   Consumer = State#state.consumer,
   case oauth_get(Url, Params, Consumer) of
     {ok, Response={{_, 200, _}, _, _}} ->
@@ -100,14 +107,14 @@ started({get_request_token, Url, Params}, _From, State) ->
       {reply, {ok, oauth:token(RParams)}, consumer_okay, NextState};
     {ok, Response} ->
       lager:warn("Unexpected response: ~p", Response),
-      {reply, Response, started, State};
+      {reply, Response, consumer_set, State};
     Error ->
-      {reply, Error, started, State}
+      {reply, Error, consumer_set, State}
   end;
 
 %% Manually set the access token if you have already gone through 
 %% the handshake for a given user.
-started({set_access_token, Token, Secret}, _From, State) ->
+consumer_set({set_access_token, {Token, Secret}}, _From, State) ->
   NextState = State#state{access_token=Token, access_secret=Secret},
   {reply, ok, authenticated, NextState}.
 
