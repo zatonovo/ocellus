@@ -3,6 +3,19 @@ ocellus
 
 Erlang application for connecting to streaming data services with oauth
 
+Initial Handshake
+-----------------
+
+```erlang
+Params = [{"track","erlang"}].
+Consumer = {"Token", "Secret", hmac_sha1}.
+{ok, Pid} = twitter_oauth:start_link(Consumer,[]).
+{ok, Token} = twitter_oauth:get_request_token(Pid, Params).
+AuthorizeUrl = twitter_oauth:get_authorization_url(Pid, Token).
+Access = twitter_oauth:get_access_token(Pid, "Verifier PIN").
+Tweets = twitter_oauth:search_tweets(Pid, "erlang").
+```
+
 Twitter
 =======
 

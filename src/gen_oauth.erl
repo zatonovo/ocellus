@@ -6,6 +6,8 @@
 %% must commence. If a user access token has already been generated,
 %% then it is unnecessary to go through the whole process. Instead, the
 %% access token just needs to be loaded and used for requests.
+%%
+%% @author Brian Lee Yung Rowe
 -module(gen_oauth).
 -behaviour(gen_fsm).
 -export([behaviour_info/1]).
