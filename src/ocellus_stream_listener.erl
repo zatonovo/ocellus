@@ -1,24 +1,25 @@
 %% This is meant to be spawned by the gen_oauth process as a listener
 %% for a streaming connection.
--module(stream_listener).
+-module(ocellus_stream_listener).
 -export([handle_stream/2]).
 
 
 
 -spec handle_stream(term(), term()) -> {ok, terminate} | {ok, stream_end} | {error, term()}.
-handle_stream(Callback, RequestId) ->
+handle_stream(Provider, RequestId) ->
   receive
     % stream opened
     {http, {RequestId, stream_start, _Headers}} ->
-        handle_stream(Callback, RequestId);
+        handle_stream(Provider, RequestId);
 
     % stream received data
     {http, {RequestId, stream, Data}} ->
         spawn(fun() ->
             DecodedData = decode(Data),
-            Callback(DecodedData)
+            %Callback(DecodedData)
+            ocellus_stream_router:stream_event(Provider, DecodedData)
         end),
-        handle_stream(Callback, RequestId);
+        handle_stream(Provider, RequestId);
 
     % stream closed
     {http, {RequestId, stream_end, _Headers}} ->

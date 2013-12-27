@@ -14,7 +14,7 @@
 -module(gen_oauth).
 -behaviour(gen_fsm).
 -export([behaviour_info/1]).
--export([start_link/1, start_link/2,
+-export([start_link/2, start_link/3,
   get_request_token/3,
   get_authorization_url/3,
   get_access_token/3,
@@ -23,7 +23,8 @@
   set_stream_handler/2,
   http_get/3,
   http_post/3,
-  http_stream/4
+  http_stream/3,
+  stop_stream/1
 ]).
 
 %% FSM states
@@ -43,11 +44,12 @@
 ]).
 
 -define(POST_CONTENT_TYPE, "application/x-www-form-urlencoded").
--record(state, {consumer,
-  request_token, request_secret, access_token, access_secret}).
+-record(state, {provider, stream_pid,
+  consumer, request_token, request_secret, access_token, access_secret}).
 
 behaviour_info(callbacks) ->
   [{init,1},
+   {set_consumer_key,2},
    {get_request_token,2},
    {get_authorization_url,2},
    {get_access_token,2},
@@ -55,11 +57,11 @@ behaviour_info(callbacks) ->
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PUBLIC API %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-start_link(Options) ->
-  gen_fsm:start_link(?MODULE, [], Options).
+start_link(Provider, Options) ->
+  gen_fsm:start_link(?MODULE, [Provider], Options).
 
-start_link(ServerName, Options) ->
-  gen_fsm:start_link(ServerName, ?MODULE, [], Options).
+start_link(ServerName, Provider, Options) ->
+  gen_fsm:start_link(ServerName, ?MODULE, [Provider], Options).
 
 
 get_request_token(ServerRef, Url, Params) ->
@@ -88,8 +90,11 @@ http_get(ServerRef, Url, Params) ->
 http_post(ServerRef, Url, Params) ->
   gen_fsm:sync_send_event(ServerRef, {http_post, Url, Params}).
 
-http_stream(ServerRef, Url, Params, Callback) ->
-  gen_fsm:send_event(ServerRef, {http_stream, Url, Params, Callback}).
+http_stream(ServerRef, Url, Params) ->
+  gen_fsm:send_event(ServerRef, {http_stream, Url, Params}).
+
+stop_stream(ServerRef) ->
+  gen_fsm:send_event(ServerRef, stop_stream).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% STATES %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -173,14 +178,21 @@ authenticated({http_post, Url, Params}, _From, State) ->
 
 
 %% Open a streaming connection
-authenticated({http_stream, Url, Params, Callback}, State) ->
+authenticated({http_stream, Url, Params}, State) ->
+  Provider = State#state.provider,
   Consumer = State#state.consumer,
   AToken = State#state.access_token,
   ASecret = State#state.access_secret,
-  %ListenerPid = oauth_post_stream(Url, Params, Consumer, AToken, ASecret),
-  %{noreply, authenticated, State#state{listener_pid=ListenerPid}}.
-  oauth_post_stream(Url, Params, Callback, Consumer, AToken, ASecret),
-  {noreply, authenticated, State}.
+  Pid = spawn_link(fun() ->
+    oauth_post_stream(Url, Params, Provider, Consumer, AToken, ASecret)
+  end),
+  {next_state, authenticated, State#state{stream_pid=Pid}};
+
+authenticated(stop_stream, #state{stream_pid=Pid}=State)
+    when Pid /= undefined ->
+  lager:info("Stopping stream"),
+  Pid ! terminate,
+  {next_state, authenticated, State#state{stream_pid=undefined}}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% INTERNAL %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 partition_oauth_params(Signed) ->
@@ -227,7 +239,8 @@ oauth_post(Url, Params, Consumer, Token, TokenSecret) ->
 
 
 %% Params = [{K,V}]
-oauth_post_stream(Url, Params, Callback, Consumer, Token, TokenSecret) ->
+oauth_post_stream(Url, Params, Provider, Consumer, Token, TokenSecret) ->
+  lager:info("Using params: ~p", [Params]),
   Signed = oauth:sign("POST", Url, Params, Consumer, Token, TokenSecret),
   {AuthorizationParams, QueryParams} = partition_oauth_params(Signed),
 
@@ -235,15 +248,13 @@ oauth_post_stream(Url, Params, Callback, Consumer, Token, TokenSecret) ->
     [oauth:header(AuthorizationParams)],
     ?POST_CONTENT_TYPE,
     oauth:uri_params_encode(QueryParams)},
-  % TODO: Spawn link instead
   Options = [{sync, false}, {stream, self}],
   lager:info("Sending request:~n~p", [Request]),
   httpc:set_options([{pipeline_timeout, 90000}]),
   case catch httpc:request(post, Request, [], Options) of
     {ok, RequestId} ->
       lager:info("Executing callback with RequestId ~p", [RequestId]),
-      stream_listener:handle_stream(Callback, RequestId);
-      %ListenerPid = spawn_link()
+      ocellus_stream_listener:handle_stream(Provider, RequestId);
     {error, Reason} ->
       lager:error("Unable to connect: ~p", [Reason])
   end.
@@ -251,8 +262,8 @@ oauth_post_stream(Url, Params, Callback, Consumer, Token, TokenSecret) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% GEN_FSM %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Intialize with consumer credentials
-init(Consumer) ->
-  {ok, started, #state{consumer=Consumer}}.
+init([Provider]) ->
+  {ok, started, #state{provider=Provider}}.
 
 %% Unused
 handle_event(_Event, StateName, State=#state{}) ->
