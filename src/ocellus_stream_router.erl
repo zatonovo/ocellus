@@ -67,6 +67,9 @@ handle_event({unregister,Pid,Provider,Channel}, #state{provider=Provider}=State)
   ets:delete_object(Tid, {{Provider, Channel}, Pid}),
   {ok, State};
 
+handle_event({event, Provider, []}, #state{provider=Provider}=State) ->
+  {ok, State};
+
 handle_event({event, Provider, Event}, #state{provider=Provider}=State) ->
   Callback = State#state.callback,
   % TODO: Make this configurable
@@ -77,9 +80,9 @@ handle_event({event, Provider, Event}, #state{provider=Provider}=State) ->
     [] -> 
       lager:info("No pids found for {~p,~p}", [Provider,Channel]),
       ok;
-    Pids ->
-      lager:debug("Broadcasting to ~p pids", [length(Pids)]),
-      lists:map(fun(Pid) -> Callback(Pid,Provider,Event) end, Pids)
+    Records ->
+      lager:debug("Broadcasting to ~p pids", [length(Records)]),
+      lists:map(fun({_,Pid}) -> Callback(Pid,Provider,Event) end, Records)
   end,
   {ok, State};
 
@@ -107,4 +110,5 @@ get_channel(_Provider, _Event) ->
   anonymous_channel.
 
 broadcast_event(Pid, Provider, Event) ->
+  lager:debug("Sending {~p,~p} to ~p", [Provider,Event,Pid]),
   Pid ! {Provider,Event}.
