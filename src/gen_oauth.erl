@@ -7,6 +7,16 @@
 %% then it is unnecessary to go through the whole process. Instead, the
 %% access token just needs to be loaded and used for requests.
 %%
+%% Here is a mapping of states and transitions
+%% () => start_link => started
+%% started => set_consumer_key => consumer_set
+%% consumer_set => get_request_token => consumer_okay (step 1)
+%% consumer_okay => get_authentication_url => pending_verification (step 2)
+%% pending_verification => get_access_token => authenticated (step 3)
+%%
+%% See https://dev.twitter.com/docs/auth/implementing-sign-twitter
+%% for the complete handshake
+%%
 %% For rest queries, one instance would be required for each user. Perhaps
 %% in the future this will change, but it might be good to leave it this
 %% way since it limits the number of synchronous requests available to a user.
@@ -15,7 +25,9 @@
 -behaviour(gen_fsm).
 -export([behaviour_info/1]).
 -export([start_link/2, start_link/3,
+  server_name/2,
   get_request_token/3,
+  get_authentication_url/3,
   get_authorization_url/3,
   get_access_token/3,
   set_access_token/2,
@@ -51,22 +63,34 @@ behaviour_info(callbacks) ->
   [{init,1},
    {set_consumer_key,2},
    {get_request_token,2},
+   {get_authentication_url,2},
    {get_authorization_url,2},
    {get_access_token,2},
    {set_access_token,2}].
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PUBLIC API %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% This is only appropriate for a single streaming instance. Otherwise, 
+%% pass in the user name.
 start_link(Provider, Options) ->
   gen_fsm:start_link(?MODULE, [Provider], Options).
 
-start_link(ServerName, Provider, Options) ->
+%% UserName: The name of the user granting oauth for the given Provider
+start_link(SessionId, Provider, Options) ->
+  ServerName = {local, server_name(SessionId, Provider)},
   gen_fsm:start_link(ServerName, ?MODULE, [Provider], Options).
+
+
+server_name(SessionId, Provider) ->
+  list_to_atom(string:join([atom_to_list(Provider), SessionId], ":")).
 
 
 get_request_token(ServerRef, Url, Params) ->
   gen_fsm:sync_send_event(ServerRef, {get_request_token, Url, Params}).
 
+
+get_authentication_url(ServerRef, Url, Token) ->
+  gen_fsm:sync_send_event(ServerRef, {get_authentication_url, Url, Token}).
 
 get_authorization_url(ServerRef, Url, Token) ->
   gen_fsm:sync_send_event(ServerRef, {get_authorization_url, Url, Token}).
@@ -78,6 +102,8 @@ get_access_token(ServerRef, Url, VerifierPin) ->
 set_access_token(ServerRef, Access) ->
   gen_fsm:sync_send_event(ServerRef, {set_access_token, Access}).
 
+%% Consumer: {Token, Secret, encryption}
+%% e.g. {"cChZNFj6T5R0TigYB9yd1w", "SECRET", hmac_sha1}
 set_consumer_key(ServerRef, Consumer) ->
   gen_fsm:send_event(ServerRef, {set_consumer_key, Consumer}).
 
@@ -103,15 +129,17 @@ started({set_consumer_key, Consumer}, State) ->
 
 consumer_set({get_request_token, Url, Params}, _From, State) ->
   Consumer = State#state.consumer,
+  lager:info("Sending request to ~p", [Url]),
   case oauth_get(Url, Params, Consumer) of
     {ok, Response={{_, 200, _}, _, _}} ->
+      lager:info("Got ok"),
       RParams = oauth:params_decode(Response),
       RToken = oauth:token(RParams),
       RSecret = oauth:token_secret(RParams),
       NextState = State#state{request_token=RToken, request_secret=RSecret},
       {reply, {ok, oauth:token(RParams)}, consumer_okay, NextState};
     {ok, Response} ->
-      lager:warn("Unexpected response: ~p", Response),
+      lager:warn("Unexpected response: ~p", [Response]),
       {reply, Response, consumer_set, State};
     Error ->
       {reply, Error, consumer_set, State}
@@ -124,6 +152,10 @@ consumer_set({set_access_token, {Token, Secret}}, _From, State) ->
   {reply, ok, authenticated, NextState}.
 
   
+consumer_okay({get_authentication_url, Url, Token}, _From, State) ->
+  AuthUrl = oauth:uri(Url, [{"oauth_token", Token}]),
+  {reply, {ok, AuthUrl}, pending_verification, State};
+
 consumer_okay({get_authorization_url, Url, Token}, _From, State) ->
   AuthUrl = oauth:uri(Url, [{"oauth_token", Token}]),
   {reply, {ok, AuthUrl}, pending_verification, State}.
