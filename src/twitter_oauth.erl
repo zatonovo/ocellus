@@ -50,7 +50,8 @@ get_access_token(ServerRef, VerifierPin) ->
   Url = "https://twitter.com/oauth/access_token",
   gen_oauth:get_access_token(ServerRef, Url, VerifierPin).
 
-set_access_token(ServerRef, Access) ->
+set_access_token(SessionId, Access) ->
+  ServerRef = gen_oauth:server_name(SessionId,twitter),
   gen_oauth:set_access_token(ServerRef, Access).
 
 set_consumer_key(ServerRef, Consumer) ->

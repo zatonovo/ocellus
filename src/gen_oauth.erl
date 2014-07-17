@@ -172,7 +172,7 @@ pending_verification({get_access_token, Url, VerifierPin}, _From, State) ->
       AToken = oauth:token(AParams),
       ASecret = oauth:token_secret(AParams),
       NextState = State#state{access_token=AToken, access_secret=ASecret},
-      {reply, ok, authenticated, NextState};
+      {reply, {AToken,ASecret}, authenticated, NextState};
     {ok, Response} ->
       lager:warn("Unexpected response: ~p", Response),
       {reply, Response, pending_verification, State};
