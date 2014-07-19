@@ -153,6 +153,11 @@ consumer_set({get_request_token, Url, Params}, _From, State) ->
 
 %% Manually set the access token if you have already gone through 
 %% the handshake for a given user.
+consumer_set({set_access_token, {Token, Secret}}, From, State) when is_binary(Token) ->
+  StrToken = binary_to_list(Token),
+  StrSecret = binary_to_list(Secret),
+  consumer_set({set_access_token, {StrToken, StrSecret}}, From, State);
+
 consumer_set({set_access_token, {Token, Secret}}, _From, State) ->
   NextState = State#state{access_token=Token, access_secret=Secret},
   {reply, ok, authenticated, NextState}.
