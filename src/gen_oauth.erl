@@ -81,7 +81,13 @@ start_link(SessionId, Provider, Options) ->
   gen_fsm:start_link(ServerName, ?MODULE, [Provider], Options).
 
 
+-spec server_name(binary(), atom()) -> atom().
+server_name(SessionId, Provider) when is_binary(SessionId) ->
+  server_name(binary_to_list(SessionId), Provider);
+
+%-spec server_name(string(), atom()) -> atom().
 server_name(SessionId, Provider) ->
+  %lager:info("[~p] Provider: ~p, SessionId: ~p", [?MODULE,Provider,SessionId]),
   list_to_atom(string:join([atom_to_list(Provider), SessionId], ":")).
 
 
