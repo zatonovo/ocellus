@@ -9,8 +9,7 @@
 %%
 %% Here is a mapping of states and transitions
 %% () => start_link => started
-%% started => set_consumer_key => consumer_set
-%% consumer_set => get_request_token => consumer_okay (step 1)
+%% started => get_request_token => consumer_okay (step 1)
 %% consumer_okay => get_authentication_url => pending_verification (step 2)
 %% pending_verification => get_access_token => authenticated (step 3)
 %%
@@ -24,14 +23,13 @@
 -module(gen_oauth).
 -behaviour(gen_fsm).
 -export([behaviour_info/1]).
--export([start_link/2, start_link/3,
+-export([start_link/3, start_link/4,
   server_name/2,
   get_request_token/3,
   get_authentication_url/3,
   get_authorization_url/3,
   get_access_token/3,
   set_access_token/2,
-  set_consumer_key/2,
   set_stream_handler/2,
   http_get/3,
   http_post/3,
@@ -40,8 +38,7 @@
 ]).
 
 %% FSM states
--export([started/2,
-  consumer_set/3,
+-export([started/3,
   consumer_okay/3,
   pending_verification/3,
   authenticated/2, authenticated/3
@@ -61,7 +58,6 @@
 
 behaviour_info(callbacks) ->
   [{init,1},
-   {set_consumer_key,2},
    {get_request_token,2},
    {get_authentication_url,2},
    {get_authorization_url,2},
@@ -72,13 +68,13 @@ behaviour_info(callbacks) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PUBLIC API %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% This is only appropriate for a single streaming instance. Otherwise, 
 %% pass in the user name.
-start_link(Provider, Options) ->
-  gen_fsm:start_link(?MODULE, [Provider], Options).
+start_link(Provider, Consumer, Options) ->
+  gen_fsm:start_link(?MODULE, [Provider, Consumer], Options).
 
 %% UserName: The name of the user granting oauth for the given Provider
-start_link(SessionId, Provider, Options) ->
+start_link(SessionId, Provider, Consumer, Options) ->
   ServerName = {local, server_name(SessionId, Provider)},
-  gen_fsm:start_link(ServerName, ?MODULE, [Provider], Options).
+  gen_fsm:start_link(ServerName, ?MODULE, [Provider, Consumer], Options).
 
 
 -spec server_name(binary(), atom()) -> atom().
@@ -108,10 +104,6 @@ get_access_token(ServerRef, Url, VerifierPin) ->
 set_access_token(ServerRef, Access) ->
   gen_fsm:sync_send_event(ServerRef, {set_access_token, Access}).
 
-%% Consumer: {Token, Secret, encryption}
-%% e.g. {"cChZNFj6T5R0TigYB9yd1w", "SECRET", hmac_sha1}
-set_consumer_key(ServerRef, Consumer) ->
-  gen_fsm:send_event(ServerRef, {set_consumer_key, Consumer}).
 
 set_stream_handler(_ServerRef, _Handler) ->
   not_implemented.
@@ -130,12 +122,9 @@ stop_stream(ServerRef) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% STATES %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-started({set_consumer_key, Consumer}, State) ->
-  {next_state, consumer_set, State#state{consumer=Consumer}}.
-
-consumer_set({get_request_token, Url, Params}, _From, State) ->
+started({get_request_token, Url, Params}, _From, State) ->
   Consumer = State#state.consumer,
-  lager:info("Sending request to ~p", [Url]),
+  lager:info("[~p] Sending request to ~p", [?MODULE,Url]),
   case oauth_get(Url, Params, Consumer) of
     {ok, Response={{_, 200, _}, _, _}} ->
       lager:info("Got ok"),
@@ -145,20 +134,20 @@ consumer_set({get_request_token, Url, Params}, _From, State) ->
       NextState = State#state{request_token=RToken, request_secret=RSecret},
       {reply, {ok, oauth:token(RParams)}, consumer_okay, NextState};
     {ok, Response} ->
-      lager:warn("Unexpected response: ~p", [Response]),
-      {reply, Response, consumer_set, State};
+      lager:warn("[~p] Unexpected response: ~p", [?MODULE,Response]),
+      {reply, Response, started, State};
     Error ->
-      {reply, Error, consumer_set, State}
+      {reply, Error, started, State}
   end;
 
 %% Manually set the access token if you have already gone through 
 %% the handshake for a given user.
-consumer_set({set_access_token, {Token, Secret}}, From, State) when is_binary(Token) ->
+started({set_access_token, {Token, Secret}}, From, State) when is_binary(Token) ->
   StrToken = binary_to_list(Token),
   StrSecret = binary_to_list(Secret),
-  consumer_set({set_access_token, {StrToken, StrSecret}}, From, State);
+  started({set_access_token, {StrToken, StrSecret}}, From, State);
 
-consumer_set({set_access_token, {Token, Secret}}, _From, State) ->
+started({set_access_token, {Token, Secret}}, _From, State) ->
   NextState = State#state{access_token=Token, access_secret=Secret},
   {reply, ok, authenticated, NextState}.
 
@@ -185,7 +174,7 @@ pending_verification({get_access_token, Url, VerifierPin}, _From, State) ->
       NextState = State#state{access_token=AToken, access_secret=ASecret},
       {reply, {AToken,ASecret}, authenticated, NextState};
     {ok, Response} ->
-      lager:warn("Unexpected response: ~p", Response),
+      lager:warn("[~p] Unexpected response: ~p", [?MODULE,Response]),
       {reply, Response, pending_verification, State};
     Error ->
       {reply, Error, pending_verification, State}
@@ -233,7 +222,7 @@ authenticated({http_stream, Url, Params}, State) ->
 
 authenticated(stop_stream, #state{stream_pid=Pid}=State)
     when Pid /= undefined ->
-  lager:info("Stopping stream"),
+  lager:info("[~p] Stopping stream", [?MODULE]),
   Pid ! terminate,
   {next_state, authenticated, State#state{stream_pid=undefined}}.
 
@@ -263,7 +252,7 @@ oauth_get(Url, Params, Consumer) ->
 
 oauth_get(Url, Params, Consumer, Token, TokenSecret) ->
   Signed = oauth:sign("GET", Url, Params, Consumer, Token, TokenSecret),
-  lager:info("Signed parameters: ~p", [Signed]),
+  lager:info("[~p] Signed parameters: ~p", [?MODULE,Signed]),
   {AuthorizationParams, QueryParams} = partition_oauth_params(Signed),
   Request = {oauth:uri(Url, QueryParams), [oauth:header(AuthorizationParams)]},
   httpc:request(get, Request, [{autoredirect, false}], []).
@@ -277,7 +266,7 @@ oauth_post(Url, Params, Consumer, Token, TokenSecret) ->
     [oauth:header(AuthorizationParams)],
     ?POST_CONTENT_TYPE,
     oauth:uri_params_encode(QueryParams)},
-  lager:info("Sending request:~n~p", [Request]),
+  lager:info("[~p] Sending request:~n~p", [?MODULE,Request]),
   httpc:request(post, Request, [], []).
 
 
@@ -292,21 +281,21 @@ oauth_post_stream(Url, Params, Provider, Consumer, Token, TokenSecret) ->
     ?POST_CONTENT_TYPE,
     oauth:uri_params_encode(QueryParams)},
   Options = [{sync, false}, {stream, self}],
-  lager:info("Sending request:~n~p", [Request]),
+  lager:info("[~p] Sending request:~n~p", [?MODULE,Request]),
   httpc:set_options([{pipeline_timeout, 90000}]),
   case catch httpc:request(post, Request, [], Options) of
     {ok, RequestId} ->
-      lager:info("Executing callback with RequestId ~p", [RequestId]),
+      lager:info("[~p] Executing callback with RequestId ~p", [?MODULE,RequestId]),
       ocellus_stream_listener:handle_stream(Provider, RequestId);
     {error, Reason} ->
-      lager:error("Unable to connect: ~p", [Reason])
+      lager:error("[~p] Unable to connect: ~p", [?MODULE,Reason])
   end.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% GEN_FSM %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Intialize with consumer credentials
-init([Provider]) ->
-  {ok, started, #state{provider=Provider}}.
+init([Provider, Consumer]) ->
+  {ok, started, #state{provider=Provider, consumer=Consumer}}.
 
 %% Unused
 handle_event(_Event, StateName, State=#state{}) ->

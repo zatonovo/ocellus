@@ -29,8 +29,7 @@ add_user(SessionId, Consumer) ->
   case whereis(Ref) of
     undefined ->
       Sup = ?MODULE,
-      {ok,Pid} = supervisor:start_child(Sup, [SessionId]),
-      twitter_oauth:set_consumer_key(Pid, Consumer),
+      {ok,Pid} = supervisor:start_child(Sup, [SessionId, Consumer]),
       Pid;
     Pid -> Pid
   end.
