@@ -80,45 +80,45 @@ get_rate_limits(SessionId, Resources) ->
 
 
 % twitter_oauth:get_user_info(SessionId, "cartesianfaith"),
-get_user_info(SessionId, UserName) ->
-  get_user_info(SessionId, UserName, []).
+get_user_info(SessionId, UserId) ->
+  get_user_info(SessionId, UserId, []).
 
-get_user_info(SessionId, UserName, Params) ->
+get_user_info(SessionId, UserId, Params) ->
   Url = "https://api.twitter.com/1.1/users/show.json",
-  p_get_request(Url, SessionId, UserName, Params).
+  p_get_request(Url, SessionId, UserId, Params).
 
 % https://dev.twitter.com/docs/api/1.1/get/friends/ids
-get_friends(SessionId, UserName) ->
-  get_friends(SessionId, UserName, []).
+get_friends(SessionId, UserId) ->
+  get_friends(SessionId, UserId, []).
 
-get_friends(SessionId, UserName, Params) ->
+get_friends(SessionId, UserId, Params) ->
   Url = "https://api.twitter.com/1.1/friends/ids.json",
-  p_get_request(Url, SessionId, UserName, Params).
+  p_get_request(Url, SessionId, UserId, Params).
 
 
 % https://dev.twitter.com/docs/api/1.1/get/followers/ids
-get_followers(SessionId, UserName) ->
-  get_followers(SessionId, UserName, []).
+get_followers(SessionId, UserId) ->
+  get_followers(SessionId, UserId, []).
 
-get_followers(SessionId, UserName, Params) ->
+get_followers(SessionId, UserId, Params) ->
   Url = "https://api.twitter.com/1.1/followers/ids.json",
-  p_get_request(Url, SessionId, UserName, Params).
+  p_get_request(Url, SessionId, UserId, Params).
 
 
-get_favorites(SessionId, UserName) ->
-  get_favorites(SessionId, UserName, []).
+get_favorites(SessionId, UserId) ->
+  get_favorites(SessionId, UserId, []).
 
-get_favorites(SessionId, UserName, Params) ->
+get_favorites(SessionId, UserId, Params) ->
   Url = "https://api.twitter.com/1.1/favorites/list.json",
-  p_get_request(Url, SessionId, UserName, Params).
+  p_get_request(Url, SessionId, UserId, Params).
 
 
-get_user_timeline(SessionId, UserName) ->
-  get_user_timeline(SessionId, UserName, []).
+get_user_timeline(SessionId, UserId) ->
+  get_user_timeline(SessionId, UserId, []).
 
-get_user_timeline(SessionId, UserName, Params) ->
+get_user_timeline(SessionId, UserId, Params) ->
   Url = "https://api.twitter.com/1.1/statuses/user_timeline.json",
-  p_get_request(Url, SessionId, UserName, Params).
+  p_get_request(Url, SessionId, UserId, Params).
 
 
 search_tweets(ServerRef, Query) -> search_tweets(ServerRef, Query, []).
@@ -140,15 +140,17 @@ init(_Args) ->
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PRIVATE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-p_get_request(Url, SessionId, UserName, Params) when is_binary(SessionId) ->
-  p_get_request(Url, binary_to_list(SessionId), UserName, Params);
+p_get_request(Url, SessionId, UserId, Params) when is_binary(SessionId) ->
+  p_get_request(Url, binary_to_list(SessionId), UserId, Params);
 
-p_get_request(Url, SessionId, UserName, Params) when is_binary(UserName) ->
-  p_get_request(Url, SessionId, binary_to_list(UserName), Params);
+p_get_request(Url, SessionId, UserId, Params) when is_binary(UserId) ->
+  p_get_request(Url, SessionId, binary_to_list(UserId), Params);
 
-p_get_request(Url, SessionId, UserName, Params) ->
+p_get_request(Url, SessionId, UserId, Params) ->
   ServerRef = gen_oauth:server_name(SessionId,twitter),
-  FullParams = [{"screen_name",UserName} | Params],
-  {ok, _Headers, Json} = gen_oauth:http_get(ServerRef, Url, FullParams),
-  jiffy:decode(Json).
+  FullParams = [{"user_id",UserId} | Params],
+  case gen_oauth:http_get(ServerRef, Url, FullParams) of
+    {ok, _Headers, Json} -> jiffy:decode(Json);
+    {{_,404,_},_} -> not_found
+  end.
 

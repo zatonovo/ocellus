@@ -181,6 +181,10 @@ pending_verification({get_access_token, Url, VerifierPin}, _From, State) ->
   end.
 
 
+%% If a session already exists, then don't re-authenticate
+authenticated({get_request_token, _Url, _Params}, _From, State) ->
+  {reply, already_authenticated, authenticated, State};
+
 %% Params: HTTP query params
 authenticated({http_get, Url, Params}, _From, State) ->
   Consumer = State#state.consumer,
