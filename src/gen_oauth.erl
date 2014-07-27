@@ -256,7 +256,7 @@ oauth_get(Url, Params, Consumer) ->
 
 oauth_get(Url, Params, Consumer, Token, TokenSecret) ->
   Signed = oauth:sign("GET", Url, Params, Consumer, Token, TokenSecret),
-  lager:info("[~p] Signed parameters: ~p", [?MODULE,Signed]),
+  lager:debug("[~p] Signed parameters: ~p", [?MODULE,Signed]),
   {AuthorizationParams, QueryParams} = partition_oauth_params(Signed),
   Request = {oauth:uri(Url, QueryParams), [oauth:header(AuthorizationParams)]},
   httpc:request(get, Request, [{autoredirect, false}], []).

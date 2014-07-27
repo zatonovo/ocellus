@@ -80,12 +80,16 @@ get_rate_limits(SessionId, Resources) ->
 
 
 % twitter_oauth:get_user_info(SessionId, "cartesianfaith"),
-get_user_info(SessionId, UserId) ->
-  get_user_info(SessionId, UserId, []).
+-spec get_user_info(bitstring(), bitstring()) -> any().
+get_user_info(SessionId, ScreenName) ->
+  get_user_info(SessionId, ScreenName, []).
 
-get_user_info(SessionId, UserId, Params) ->
+%% Must use screen_name here since user_id is as of yet unknown until
+%% after calling this function
+-spec get_user_info(bitstring(), bitstring(), list()) -> any().
+get_user_info(SessionId, ScreenName, Params) ->
   Url = "https://api.twitter.com/1.1/users/show.json",
-  p_get_request(Url, SessionId, UserId, Params).
+  p_get_request(Url, SessionId, {"screen_name",ScreenName}, Params).
 
 % https://dev.twitter.com/docs/api/1.1/get/friends/ids
 get_friends(SessionId, UserId) ->
@@ -93,7 +97,8 @@ get_friends(SessionId, UserId) ->
 
 get_friends(SessionId, UserId, Params) ->
   Url = "https://api.twitter.com/1.1/friends/ids.json",
-  p_get_request(Url, SessionId, UserId, Params).
+  FullParams = [{"stringify_ids",true} | Params],
+  p_get_request(Url, SessionId, UserId, FullParams).
 
 
 % https://dev.twitter.com/docs/api/1.1/get/followers/ids
@@ -102,7 +107,8 @@ get_followers(SessionId, UserId) ->
 
 get_followers(SessionId, UserId, Params) ->
   Url = "https://api.twitter.com/1.1/followers/ids.json",
-  p_get_request(Url, SessionId, UserId, Params).
+  FullParams = [{"stringify_ids",true} | Params],
+  p_get_request(Url, SessionId, UserId, FullParams).
 
 
 get_favorites(SessionId, UserId) ->
@@ -140,17 +146,34 @@ init(_Args) ->
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PRIVATE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-p_get_request(Url, SessionId, UserId, Params) when is_binary(SessionId) ->
-  p_get_request(Url, binary_to_list(SessionId), UserId, Params);
-
-p_get_request(Url, SessionId, UserId, Params) when is_binary(UserId) ->
-  p_get_request(Url, SessionId, binary_to_list(UserId), Params);
-
-p_get_request(Url, SessionId, UserId, Params) ->
+-spec p_get_request(string(), string(), {string(),string()}, list()) -> any().
+p_get_request(Url, SessionId, {IdType,UserId}, Params) when
+    is_list(SessionId) and is_list(IdType) and is_list(UserId) ->
   ServerRef = gen_oauth:server_name(SessionId,twitter),
-  FullParams = [{"user_id",UserId} | Params],
+  FullParams = [{IdType,UserId} | Params],
   case gen_oauth:http_get(ServerRef, Url, FullParams) of
     {ok, _Headers, Json} -> jiffy:decode(Json);
-    {{_,404,_},_} -> not_found
-  end.
+    {{_,401,_},_,_} -> {error,private};
+    {{_,404,_},_,_} -> {error,not_found};
+    {{Description,Code,_},_,_} ->
+      lager:warning("[~p] Unexpected GET response: ~p", [?MODULE,Code]),
+      {error, Description}
+  end;
+
+p_get_request(Url, SessionId, {IdType,UserId}, Params) when 
+    is_binary(SessionId) and is_binary(UserId) ->
+  SessionIdStr = binary_to_list(SessionId),
+  UserIdStr = binary_to_list(UserId),
+  p_get_request(Url, SessionIdStr, {IdType,UserIdStr}, Params);
+
+p_get_request(Url, SessionId, UserId, Params) when 
+    is_bitstring(SessionId) and is_bitstring(UserId) ->
+  SessionIdStr = binary_to_list(SessionId),
+  UserIdStr = binary_to_list(UserId),
+  p_get_request(Url, SessionIdStr, {"user_id",UserIdStr}, Params);
+
+p_get_request(Url, SessionId, UserId, Params) when 
+    is_list(SessionId) and is_list(UserId) ->
+  p_get_request(Url, SessionId, {"user_id",UserId}, Params).
+
 
