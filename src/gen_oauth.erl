@@ -25,6 +25,7 @@
 -export([behaviour_info/1]).
 -export([start_link/3, start_link/4,
   server_name/2,
+  identify/1,
   get_request_token/3,
   get_authentication_url/3,
   get_authorization_url/3,
@@ -62,7 +63,8 @@ behaviour_info(callbacks) ->
    {get_authentication_url,2},
    {get_authorization_url,2},
    {get_access_token,2},
-   {set_access_token,2}].
+   {set_access_token,2},
+   {identify,1}].
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PUBLIC API %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -103,6 +105,9 @@ get_access_token(ServerRef, Url, VerifierPin) ->
 
 set_access_token(ServerRef, Access) ->
   gen_fsm:sync_send_event(ServerRef, {set_access_token, Access}).
+
+identify(ServerRef) ->
+  gen_fsm:sync_send_event(ServerRef, identify).
 
 
 set_stream_handler(_ServerRef, _Handler) ->
@@ -180,6 +185,13 @@ pending_verification({get_access_token, Url, VerifierPin}, _From, State) ->
       {reply, Error, pending_verification, State}
   end.
 
+
+authenticated(identify, _From, State) ->
+  Name = case process_info(self(), registered_name) of
+    [] -> {self(),not_registered};
+    N -> N
+  end,
+  {reply, Name, authenticated, State};
 
 %% If a session already exists, then don't re-authenticate
 authenticated({get_request_token, _Url, _Params}, _From, State) ->

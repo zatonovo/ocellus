@@ -6,9 +6,10 @@
   get_favorites/2, get_favorites/3,
   search_tweets/2, search_tweets/3,
   get_user_timeline/2, get_user_timeline/3,
+  get_home_timeline/2, get_home_timeline/3,
   filter_stream/2, filter_stream/3,
   get_account_settings/1,
-  get_user_info/2,
+  get_user_info/2, get_screen_name/2,
   get_rate_limits/1, get_rate_limits/2,
   get_friends/2, get_friends/3,
   get_followers/2, get_followers/3
@@ -18,7 +19,8 @@
   get_authentication_url/2,
   get_authorization_url/2,
   get_access_token/2,
-  set_access_token/2]).
+  set_access_token/2,
+  identify/1]).
 
 
 start_link(Consumer) ->
@@ -55,6 +57,8 @@ set_access_token(SessionId, Access) ->
   ServerRef = gen_oauth:server_name(SessionId,twitter),
   gen_oauth:set_access_token(ServerRef, Access).
 
+identify(ServerRef) ->
+  gen_oauth:identify(ServerRef).
 
 
 get_account_settings(SessionId) ->
@@ -64,18 +68,29 @@ get_account_settings(SessionId) ->
   jiffy:decode(Json).
   
 % https://dev.twitter.com/docs/rate-limiting/1.1/limits
+%% If a resource hasn't been used in a window, the window will continue to
+%% update such that ResetTs - now() = 15 minutes. Once a resource has been
+%% used, the ResetTs will stay constant until reset.
 get_rate_limits(SessionId) ->
   Url = "https://api.twitter.com/1.1/application/rate_limit_status.json",
   ServerRef = gen_oauth:server_name(SessionId,twitter),
-  {ok, _Headers, Json} = gen_oauth:http_get(ServerRef, Url, []),
-  jiffy:decode(Json).
+  {ok, Headers, Json} = gen_oauth:http_get(ServerRef, Url, []),
+  LocalClock = calendar:datetime_to_gregorian_seconds(calendar:now_to_datetime(now())),
+  DateTime = p_parse_date(Headers),
+  TwitterClock = calendar:datetime_to_gregorian_seconds(DateTime),
+  Drift = LocalClock - TwitterClock +1, % Add a shim to ensure reset occurs
+  {Drift,jiffy:decode(Json)}.
 
 get_rate_limits(SessionId, Resources) ->
   Url = "https://api.twitter.com/1.1/application/rate_limit_status.json",
   ServerRef = gen_oauth:server_name(SessionId,twitter),
   Params = [{"resources",Resources}],
-  {ok, _Headers, Json} = gen_oauth:http_get(ServerRef, Url, Params),
-  jiffy:decode(Json).
+  {ok, Headers, Json} = gen_oauth:http_get(ServerRef, Url, Params),
+  LocalClock = calendar:datetime_to_gregorian_seconds(calendar:now_to_datetime(now())),
+  DateTime = p_parse_date(Headers),
+  TwitterClock = calendar:datetime_to_gregorian_seconds(DateTime),
+  Drift = LocalClock - TwitterClock +1, % Add a shim to ensure reset occurs
+  {Drift,jiffy:decode(Json)}.
 
 
 
@@ -91,6 +106,11 @@ get_user_info(SessionId, ScreenName, Params) ->
   Url = "https://api.twitter.com/1.1/users/show.json",
   p_get_request(Url, SessionId, {"screen_name",ScreenName}, Params).
 
+
+get_screen_name(SessionId, UserId) ->
+  Url = "https://api.twitter.com/1.1/users/show.json",
+  p_get_request(Url, SessionId, UserId, []).
+  
 % https://dev.twitter.com/docs/api/1.1/get/friends/ids
 get_friends(SessionId, UserId) ->
   get_friends(SessionId, UserId, []).
@@ -126,6 +146,15 @@ get_user_timeline(SessionId, UserId, Params) ->
   Url = "https://api.twitter.com/1.1/statuses/user_timeline.json",
   p_get_request(Url, SessionId, UserId, Params).
 
+% Use max_id and since_id as in
+% https://dev.twitter.com/docs/working-with-timelines
+get_home_timeline(SessionId, UserId) ->
+  get_home_timeline(SessionId, UserId, []).
+
+get_home_timeline(SessionId, UserId, Params) ->
+  Url = "https://api.twitter.com/1.1/statuses/home_timeline.json",
+  p_get_request(Url, SessionId, UserId, Params).
+
 
 search_tweets(ServerRef, Query) -> search_tweets(ServerRef, Query, []).
 
@@ -146,6 +175,10 @@ init(_Args) ->
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PRIVATE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+p_parse_date(Headers) ->
+  StrDate = proplists:get_value("date",Headers),
+  httpd_util:convert_request_date(StrDate).
+
 -spec p_get_request(string(), string(), {string(),string()}, list()) -> any().
 p_get_request(Url, SessionId, {IdType,UserId}, Params) when
     is_list(SessionId) and is_list(IdType) and is_list(UserId) ->
@@ -153,8 +186,12 @@ p_get_request(Url, SessionId, {IdType,UserId}, Params) when
   FullParams = [{IdType,UserId} | Params],
   case gen_oauth:http_get(ServerRef, Url, FullParams) of
     {ok, _Headers, Json} -> jiffy:decode(Json);
-    {{_,401,_},_,_} -> {error,private};
-    {{_,404,_},_,_} -> {error,not_found};
+    {{_,401,_},_,_} -> {error,private,{IdType,UserId}};
+    {{_,404,_},_,_} -> {error,not_found,{IdType,UserId}};
+    {{_,429,_},Headers,_} -> 
+      % This can happen if another app uses the limits 
+      lager:warning("[~p] Rate limit exceeded for ~p", [?MODULE,SessionId]),
+      {error,too_many_requests,Headers};
     {{Description,Code,_},_,_} ->
       lager:warning("[~p] Unexpected GET response: ~p", [?MODULE,Code]),
       {error, Description}

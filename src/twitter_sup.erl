@@ -2,7 +2,7 @@
 -behaviour(supervisor).
  
 -export([start_link/0]).
--export([init/1, add_user/2]).
+-export([init/1, add_user/2, identify/0]).
  
 
 start_link() ->
@@ -33,3 +33,7 @@ add_user(SessionId, Consumer) ->
       Pid;
     Pid -> Pid
   end.
+
+identify() ->
+  Children = supervisor:which_children(?MODULE),
+  [ M:identify(Pid) || {_,Pid,_, [M]} <- Children ].

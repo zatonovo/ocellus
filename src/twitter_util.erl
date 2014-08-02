@@ -2,13 +2,13 @@
 -export([get_rate_limit/2]).
 
 -spec get_rate_limit(binary(), term()) -> list().
-get_rate_limit(Key, {RawLimits}) ->
+get_rate_limit(Key, {Drift,{RawLimits}}) ->
   Resource = get_resource(Key),
   {ResourcePList} = proplists:get_value(<<"resources">>, RawLimits),
   {Set} = proplists:get_value(Resource, ResourcePList),
   {Element} = proplists:get_value(Key, Set),
-  {proplists:get_value(<<"remaining">>,Element),
-   proplists:get_value(<<"reset">>,Element)}.
+  ResetTs = proplists:get_value(<<"reset">>,Element) + Drift,
+  {proplists:get_value(<<"remaining">>,Element), ResetTs}.
 
 
 -spec get_resource(binary()) -> binary().
