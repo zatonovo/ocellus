@@ -197,6 +197,13 @@ authenticated(identify, _From, State) ->
 authenticated({get_request_token, _Url, _Params}, _From, State) ->
   {reply, already_authenticated, authenticated, State};
 
+%% This can happen if the browser refreshes. In this case, just
+%% return existing access tokens instead of querying service again.
+authenticated({get_access_token, _Url, _VerifierPin}, _From, State) ->
+  AToken = State#state.access_token,
+  ASecret = State#state.access_secret,
+  {reply, {AToken,ASecret}, authenticated, State};
+
 %% Params: HTTP query params
 authenticated({http_get, Url, Params}, _From, State) ->
   Consumer = State#state.consumer,
