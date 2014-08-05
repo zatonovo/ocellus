@@ -107,6 +107,7 @@ get_user_info(SessionId, ScreenName, Params) ->
   p_get_request(Url, SessionId, {"screen_name",ScreenName}, Params).
 
 
+%% Actually returns whole user info object
 get_screen_name(SessionId, UserId) ->
   Url = "https://api.twitter.com/1.1/users/show.json",
   p_get_request(Url, SessionId, UserId, []).
