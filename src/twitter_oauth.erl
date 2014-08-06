@@ -195,7 +195,7 @@ p_get_request(Url, SessionId, {IdType,UserId}, Params) when
       {error,too_many_requests,Headers};
     {{Description,Code,_},_,_} ->
       lager:warning("[~p] Unexpected GET response: ~p", [?MODULE,Code]),
-      {error, Description}
+      {error, Code, Description}
   end;
 
 p_get_request(Url, SessionId, {IdType,UserId}, Params) when 

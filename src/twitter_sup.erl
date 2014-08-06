@@ -2,7 +2,7 @@
 -behaviour(supervisor).
  
 -export([start_link/0]).
--export([init/1, add_user/2, identify/0]).
+-export([init/1, add_user/2, stop_user/1, identify/0]).
  
 
 start_link() ->
@@ -28,11 +28,23 @@ add_user(SessionId, Consumer) ->
   Ref = gen_oauth:server_name(SessionId,twitter),
   case whereis(Ref) of
     undefined ->
-      Sup = ?MODULE,
-      {ok,Pid} = supervisor:start_child(Sup, [SessionId, Consumer]),
+      {ok,Pid} = supervisor:start_child(?MODULE, [SessionId, Consumer]),
       Pid;
     Pid -> Pid
   end.
+
+%% Stop user twitter_oauth process. This is only local and does not affect
+%% the persisted sessions.
+stop_user(SessionId) ->
+  Ref = gen_oauth:server_name(SessionId,twitter),
+  case whereis(Ref) of
+    undefined ->
+      Msg = "[~p] Cowardly refusing to kill unknown child ~p", 
+      lager:info(Msg,[?MODULE,SessionId]);
+    Pid ->
+      supervisor:terminate_child(?MODULE, Pid)
+  end.
+  
 
 identify() ->
   Children = supervisor:which_children(?MODULE),
