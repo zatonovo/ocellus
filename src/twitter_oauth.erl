@@ -193,8 +193,9 @@ p_get_request(Url, SessionId, {IdType,UserId}, Params) when
       % This can happen if another app uses the limits 
       lager:warning("[~p] Rate limit exceeded for ~p", [?MODULE,SessionId]),
       {error,too_many_requests,Headers};
-    {{Description,Code,_},_,_} ->
-      lager:warning("[~p] Unexpected GET response: ~p", [?MODULE,Code]),
+    {{_,Code,_},_H,Description} ->
+      lager:warning("[~p] Unexpected GET response ~p for ~p:~p", 
+        [?MODULE,Code,UserId,Description]),
       {error, Code, Description}
   end;
 

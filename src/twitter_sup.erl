@@ -29,6 +29,8 @@ add_user(SessionId, Consumer) ->
   case whereis(Ref) of
     undefined ->
       {ok,Pid} = supervisor:start_child(?MODULE, [SessionId, Consumer]),
+      Msg = "[~p] Started child ~p for session ~p",
+      lager:info(Msg, [?MODULE,Pid,SessionId]),
       Pid;
     Pid -> Pid
   end.
@@ -42,6 +44,8 @@ stop_user(SessionId) ->
       Msg = "[~p] Cowardly refusing to kill unknown child ~p", 
       lager:info(Msg,[?MODULE,SessionId]);
     Pid ->
+      Msg = "[~p] Terminating child ~p for session ~p",
+      lager:info(Msg, [?MODULE,Pid,SessionId]),
       supervisor:terminate_child(?MODULE, Pid)
   end.
   
