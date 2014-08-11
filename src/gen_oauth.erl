@@ -132,7 +132,6 @@ started({get_request_token, Url, Params}, _From, State) ->
   lager:info("[~p] Sending request to ~p", [?MODULE,Url]),
   case oauth_get(Url, Params, Consumer) of
     {ok, Response={{_, 200, _}, _, _}} ->
-      lager:info("Got ok"),
       RParams = oauth:params_decode(Response),
       RToken = oauth:token(RParams),
       RSecret = oauth:token_secret(RParams),
@@ -165,6 +164,10 @@ consumer_okay({get_authorization_url, Url, Token}, _From, State) ->
   AuthUrl = oauth:uri(Url, [{"oauth_token", Token}]),
   {reply, {ok, AuthUrl}, pending_verification, State}.
 
+
+pending_verification({get_request_token, Url, Params}, _From, State) ->
+  lager:warning("[~p] Invalid state for ~p ~p", [?MODULE,Url,Params]),
+  {reply, invalid_state, pending_verification, State};
 
 pending_verification({get_access_token, Url, VerifierPin}, _From, State) ->
   Params = [{"oauth_verifier", VerifierPin}],
