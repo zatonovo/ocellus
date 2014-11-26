@@ -157,10 +157,11 @@ get_home_timeline(SessionId, UserId, Params) ->
   p_get_request(Url, SessionId, UserId, Params).
 
 
-search_tweets(ServerRef, Query) -> search_tweets(ServerRef, Query, []).
+search_tweets(SessionId, Query) -> search_tweets(SessionId, Query, []).
 
-search_tweets(ServerRef, SearchQuery, Params) ->
+search_tweets(SessionId, SearchQuery, Params) ->
   Url = "https://api.twitter.com/1.1/search/tweets.json",
+  ServerRef = gen_oauth:server_name(SessionId,twitter),
   gen_oauth:http_get(ServerRef, Url, [{"q",SearchQuery} | Params]).
 
 filter_stream(ServerRef, SearchQuery) ->

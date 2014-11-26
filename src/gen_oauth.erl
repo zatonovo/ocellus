@@ -319,7 +319,7 @@ oauth_post_stream(Url, Params, Provider, Consumer, Token, TokenSecret) ->
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% GEN_FSM %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Intialize with consumer credentials
+%% Initialize with consumer credentials
 init([Provider, Consumer]) ->
   {ok, started, #state{provider=Provider, consumer=Consumer}}.
 
