@@ -12,7 +12,8 @@
   get_user_info/2, get_screen_name/2,
   get_rate_limits/1, get_rate_limits/2,
   get_friends/2, get_friends/3,
-  get_followers/2, get_followers/3
+  get_followers/2, get_followers/3,
+  get_lists_members/3, get_lists_members/4
 ]).
 -export([init/1,
   get_request_token/2,
@@ -156,6 +157,15 @@ get_home_timeline(SessionId, UserId, Params) ->
   Url = "https://api.twitter.com/1.1/statuses/home_timeline.json",
   p_get_request(Url, SessionId, UserId, Params).
 
+get_lists_members(SessionId, OwnerId, ListName) ->
+  get_lists_members(SessionId, OwnerId, ListName, []).
+
+get_lists_members(SessionId, OwnerId, ListName, Params) ->
+  Url = "https://api.twitter.com/1.1/lists/members.json",
+  % The first count param is used in the get request when count is also
+  % specified in Params. Need to add override for count.
+  FullParams = [{"owner_id",OwnerId}, {"slug", ListName}, {"count",1000} | Params],
+  p_get_request(Url, SessionId, OwnerId, FullParams).
 
 search_tweets(SessionId, Query) -> search_tweets(SessionId, Query, []).
 
