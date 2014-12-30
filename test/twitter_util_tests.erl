@@ -1,8 +1,8 @@
--module(test_twitter_util).
--export([test_rate_limit/0]).
+-module(twitter_util_tests).
+-export([get_rate_limit_test/0]).
 
-test_rate_limit() ->
-  Blob = {[{<<"rate_limit_context">>,
+get_rate_limit_test() ->
+  Blob = {1, {[{<<"rate_limit_context">>, % Drift is 1 here
    {[{<<"access_token">>,
       <<"16145405-OHVqHZ2uSfdgtydJIeL1Np6npW3Utdt1nWswGX2pt">>}]}},
   {<<"resources">>,
@@ -105,8 +105,10 @@ test_rate_limit() ->
         {<<"/friends/following/list">>,
          {[{<<"limit">>,15},
            {<<"remaining">>,15},
-           {<<"reset">>,1405797670}]}}]}}]}}]},
-  {150, 1505797670} = twitter_util:get_rate_limit(<<"/friends/ids">>,Blob),
-  {179, 1405797494} = twitter_util:get_rate_limit(<<"/users/show/:id">>,Blob),
+           {<<"reset">>,1405797670}]}}]}}]}}]}},
+  % need to match on {Remaining, ResetTs + Drift}
+  {150, 1505797671} = twitter_util:get_rate_limit(<<"/friends/ids">>,Blob),
+  {179, 1405797495} = twitter_util:get_rate_limit(<<"/users/show/:id">>,Blob),
   ok.
+
 
