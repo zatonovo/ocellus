@@ -108,7 +108,4 @@ get_rate_limit_test() ->
            {<<"reset">>,1405797670}]}}]}}]}}]}},
   % need to match on {Remaining, ResetTs + Drift}
   {150, 1505797671} = twitter_util:get_rate_limit(<<"/friends/ids">>,Blob),
-  {179, 1405797495} = twitter_util:get_rate_limit(<<"/users/show/:id">>,Blob),
-  ok.
-
-
+  {179, 1405797495} = twitter_util:get_rate_limit(<<"/users/show/:id">>,Blob).
