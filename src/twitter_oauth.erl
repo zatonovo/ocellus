@@ -162,9 +162,10 @@ get_lists_members(SessionId, OwnerId, ListName) ->
 
 get_lists_members(SessionId, OwnerId, ListName, Params) ->
   Url = "https://api.twitter.com/1.1/lists/members.json",
-  % The first count param is used in the get request when count is also
-  % specified in Params. Need to add override for count.
-  FullParams = [{"owner_id",OwnerId}, {"slug", ListName}, {"count",1000} | Params],
+  % If duplicate params exist in FullParams, the get request will
+  % use the first param. Need to update this behavior.
+  FullParams = [{"owner_id",OwnerId}, {"slug",ListName},
+                {"count",1000} | Params],
   p_get_request(Url, SessionId, OwnerId, FullParams).
 
 search_tweets(SessionId, Query) -> search_tweets(SessionId, Query, []).
