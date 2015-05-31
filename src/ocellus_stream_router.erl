@@ -12,15 +12,17 @@
 %% ocellus_stream_router:add_provider(twitter, Callback).
 -module(ocellus_stream_router).
 -behaviour(gen_event).
+-define(NEWLINE, <<"\r\n">>).
 
 -export([stream_event/2, register/3, unregister/3, get_callback/1]).
 -export([start_link/0, add_provider/1, add_provider/2]).
 -export([init/1, handle_event/2, handle_call/2, handle_info/2, 
   code_change/3, format_status/2, terminate/2]).
 
--record(state, {provider, channel_table, callback}).
+-record(state, {provider, fragment= <<>>, channel_table, callback}).
 
-%% Add a new event
+%% Add a new event. This could be a partial message. See
+%% https://dev.twitter.com/streaming/overview/processing#delimited
 stream_event(Provider, Event) ->
   gen_event:notify(?MODULE, {event, Provider, Event}).
 
@@ -47,6 +49,27 @@ add_provider(Provider, Callback) ->
   gen_event:add_handler(?MODULE, {?MODULE,Provider}, {Provider, Callback}).
   
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PRIVATE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Extract messages and split on \r\n. Cache incomplete strings as needed.
+p_parse_event(Event,#state{fragment=Fragment}=State) ->
+  {Message,NextFragment} = case binary:match(Event, ?NEWLINE) of
+    nomatch -> 
+      try {no_message, <<Fragment/binary,Event/binary>>}
+      catch _Error:Reason ->
+        Msg = "Unable to extend fragment comprising ~p and ~p",
+        lager:warning(Msg,[Fragment,Event]),
+        {no_message, Event}
+      end;
+    _PosLen ->
+      [H,T] = binary:split(Event,?NEWLINE),
+      try {<<Fragment/binary,H/binary>>, T}
+      catch _Error:Reason ->
+        Msg = "Unable to complete fragment comprising ~p and ~p",
+        lager:warning(Msg,[Fragment,H]),
+        {H, T}
+      end
+  end,
+  {Message, State#state{fragment=NextFragment}}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%% GEN_EVENT CALLBACKS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Table structure is {{Provider,Channel}, Subscriber}
@@ -70,19 +93,25 @@ handle_event({unregister,Pid,Provider,Channel}, #state{provider=Provider}=State)
 handle_event({event, Provider, []}, #state{provider=Provider}=State) ->
   {ok, State};
 
-handle_event({event, Provider, Event}, #state{provider=Provider}=State) ->
-  Callback = State#state.callback,
-  % TODO: Make this configurable
-  Channel = get_channel(Provider, Event),
-  lager:info("Pushing event to {~p,~p}", [Provider,Channel]),
-  Tid = State#state.channel_table,
-  case ets:lookup(Tid, {Provider,Channel}) of
-    [] -> 
-      lager:info("No pids found for {~p,~p}", [Provider,Channel]),
-      ok;
-    Records ->
-      lager:debug("Broadcasting to ~p pids", [length(Records)]),
-      lists:map(fun({_,Pid}) -> Callback(Pid,Provider,Event) end, Records)
+handle_event({event, Provider, Event}, #state{provider=Provider}=OldState) ->
+  {Message,State} = p_parse_event(Event,OldState),
+  case Message of
+    no_message -> ok;
+    <<>> -> ok;
+    _ ->
+      Callback = State#state.callback,
+      % TODO: Make this configurable
+      Channel = get_channel(Provider, Message),
+      lager:info("Pushing event to {~p,~p}", [Provider,Channel]),
+      Tid = State#state.channel_table,
+      case ets:lookup(Tid, {Provider,Channel}) of
+        [] -> 
+          lager:info("No pids found for {~p,~p}", [Provider,Channel]),
+          ok;
+        Records ->
+          lager:debug("Broadcasting to ~p pids", [length(Records)]),
+          lists:map(fun({_,Pid}) -> Callback(Pid,Provider,Message) end, Records)
+      end
   end,
   {ok, State};
 

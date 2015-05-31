@@ -79,7 +79,9 @@ start_link(SessionId, Provider, Consumer, Options) ->
   gen_fsm:start_link(ServerName, ?MODULE, [Provider, Consumer], Options).
 
 
--spec server_name(binary(), atom()) -> atom().
+%-spec server_name(binary(), atom()) -> atom().
+server_name(Pid, _Provider) when is_pid(Pid) -> Pid;
+
 server_name(SessionId, Provider) when is_binary(SessionId) ->
   server_name(binary_to_list(SessionId), Provider);
 
