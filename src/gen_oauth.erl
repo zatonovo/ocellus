@@ -313,7 +313,7 @@ oauth_post_stream(Url, Params, Provider, Consumer, Token, TokenSecret) ->
   httpc:set_options([{pipeline_timeout, 90000}]),
   case catch httpc:request(post, Request, [], Options) of
     {ok, RequestId} ->
-      lager:info("[~p] Executing callback with RequestId ~p", [?MODULE,RequestId]),
+      lager:info("[~p] Initiate stream handler for RequestId ~p", [?MODULE,RequestId]),
       ocellus_stream_listener:handle_stream(Provider, RequestId);
     {error, Reason} ->
       lager:error("[~p] Unable to connect: ~p", [?MODULE,Reason])
