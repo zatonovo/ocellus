@@ -38,11 +38,7 @@ Streaming API
 ```erlang
 Consumer = {"Token", "Secret", hmac_sha1}.
 Access = {"Token", "Secret"}.
-
-Consumer = {"1v19ot5exN8dKpVpImHHmiFhA","QUEatLR344UpSyBjHEc6J8X7mtgoIBPtFqnpb2hPJLSzPKTfD3",hmac_sha1}.
-Access = {"16145405-fZveWgBbtq8m30aW447Pir7WOzcpWAr2fIRHqU30E","0fMdSzsZplCzK43OvRFSNNofYNR0sW9L8QjsBSeZOJt01"}.
-Query = "#Science,#Ciencia,#Educación,#Education,#SocialScience,#CienciasSociales,#Communication,#Comunicación,#OpenData,@scimago,@thomsonreuters,@Scopus,@redescielo".
-
+Query = "".
 {ok, Pid} = twitter_oauth:start_link(Consumer).
 twitter_oauth:set_access_token(Pid, Access).
 Callback =  fun(Pid, Provider, Json) ->
@@ -57,21 +53,9 @@ ocellus_stream_router:register(self(), twitter, anonymous_channel).
 twitter_oauth:filter_stream(Pid, Query).
 ```
 
-Configuration
-. query id
-. search terms
-. consumer tokens
-. access tokens
-. max list size (n)
-
 Database Callback Provider
 . Decode tweet, add to buffer
 . When length > n, save to DB
-
-. Create table
-. Create app
-. [pzstore] Add insert query
-. [pzstore] Add select query
 
 
 
