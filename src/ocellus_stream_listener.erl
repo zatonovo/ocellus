@@ -19,7 +19,8 @@ handle_stream(Provider, RequestId) ->
 
     % stream closed
     {http, {RequestId, stream_end, _Headers}} ->
-      lager:info("[~p] Stream closed for ~p", [?MODULE,RequestId]),
+      lager:info("[~p] Stream closed for ~p. Reconnect", [?MODULE,RequestId]),
+      dragonfly_listener:restart(),
       {ok, stream_end};
 
     % connected but received error cod

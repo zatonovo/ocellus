@@ -23,7 +23,7 @@
 -module(gen_oauth).
 -behaviour(gen_fsm).
 -export([behaviour_info/1]).
--export([start_link/3, start_link/4,
+-export([start_link/3, start_link/4, stop/1,
   server_name/2,
   identify/1,
   get_request_token/3,
@@ -126,6 +126,9 @@ http_stream(ServerRef, Url, Params) ->
 
 stop_stream(ServerRef) ->
   gen_fsm:send_event(ServerRef, stop_stream).
+
+stop(ServerRef) ->
+  gen_fsm:send_all_state_event(ServerRef, stop).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% STATES %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -325,9 +328,10 @@ oauth_post_stream(Url, Params, Provider, Consumer, Token, TokenSecret) ->
 init([Provider, Consumer]) ->
   {ok, started, #state{provider=Provider, consumer=Consumer}}.
 
-%% Unused
-handle_event(_Event, StateName, State=#state{}) ->
-  {next_state, StateName, State}.
+%% 
+handle_event(stop, _StateName, State=#state{}) ->
+  lager:info("[~p] Shutdown requested",[?MODULE]),
+  {stop, normal, State}.
 
 %% Unused
 handle_sync_event(_Event, _From, StateName, State=#state{}) ->

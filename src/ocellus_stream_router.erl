@@ -88,7 +88,7 @@ handle_event({unregister,Pid,Provider,Channel}, #state{provider=Provider}=State)
   lager:info("Deleting {{~p,~p}, ~p}", [Provider,Channel,Pid]),
   Tid = State#state.channel_table,
   ets:delete_object(Tid, {{Provider, Channel}, Pid}),
-  {ok, State};
+  {ok, State#state{fragment= <<>>}};
 
 handle_event({event, Provider, []}, #state{provider=Provider}=State) ->
   {ok, State};

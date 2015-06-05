@@ -53,9 +53,10 @@ ocellus_stream_router:register(self(), twitter, anonymous_channel).
 twitter_oauth:filter_stream(Pid, Query).
 ```
 
-Database Callback Provider
-. Decode tweet, add to buffer
-. When length > n, save to DB
 
-
-
+Tasks
+x. Push ocellus
+x. Push me3api
+x. Redeploy me3api on data-1
+x. Redeploy dragonfly on dragonfly-1
+. Test if stream has closed (maybe from request id?). If so, reinitiate
