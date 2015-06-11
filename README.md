@@ -3,8 +3,27 @@ ocellus
 
 Erlang application for connecting to streaming data services with oauth
 
-Initial Handshake
------------------
+This library provides a `gen_fsm` behavior around the oauth process to
+manage the steps. On top of this behavior are specific handlers for
+APIs that use oauth. Currently only the Twitter API is supported.
+
+Twitter
+=======
+
+Getting Started
+---------------
+You need a Twitter account and sign up for their developer program.
+Create an application and note the consumer token and secret.
+
+REST API
+--------
+
+### Initial Handshake
+
+If you are using the library for any arbitrary user, it's necessary to
+be granted permission by that user. The simplest way is to use Twitter's
+inline authorization process. For testing purposes (i.e. in the shell),
+you can use the below method.
 
 ```erlang
 Params = [{"track","erlang"}].
@@ -17,11 +36,13 @@ Access = twitter_oauth:get_access_token(Pid, "Verifier PIN").
 Tweets = twitter_oauth:search_tweets(Pid, "erlang").
 ```
 
-Twitter
-=======
+### Using existing access tokens
 
-REST API
---------
+Once a user authorizes an application, the access tokens can be reused until
+they expire. Assuming these are stored, it's possible to shortcut the
+oauth handshake and simply assign the access token. Note that if you generate
+access tokens with your user account for a given application, you can enter
+them directly. This is also useful for an "app-only" style authentication.
 
 ```erlang
 Consumer = {"Token", "Secret", hmac_sha1}.
@@ -34,6 +55,9 @@ twitter_oauth:search_tweets(Pid, Query).
 
 Streaming API
 -------------
+Twitter supports both a REST API and a streaming API over HTTP. To use
+the streaming API, you need to define a callback function to handle each
+tweet that's pushed to ocellus.
 
 ```erlang
 Consumer = {"Token", "Secret", hmac_sha1}.
@@ -48,15 +72,19 @@ Callback =  fun(Pid, Provider, Json) ->
   ScreenName = proplists:get_value(<<"screen_name">>,User),
   io:format("[~p] ~s says: ~s~n", [Provider, ScreenName, Tweet])
 end.
+
+% Add a handler for twitter events
 ocellus_stream_router:add_provider(twitter, Callback).
+
+% Register ourself as the recipient of messages. This is for more sophisticated
+% routing of messages.
 ocellus_stream_router:register(self(), twitter, anonymous_channel).
+
+% Initiate the stream
 twitter_oauth:filter_stream(Pid, Query).
 ```
 
+Future
+======
 
-Tasks
-x. Push ocellus
-x. Push me3api
-x. Redeploy me3api on data-1
-x. Redeploy dragonfly on dragonfly-1
-. Test if stream has closed (maybe from request id?). If so, reinitiate
++ Add support for other APIs
