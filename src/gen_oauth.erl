@@ -241,13 +241,15 @@ authenticated({http_post, Url, Params}, _From, State) ->
 
 
 %% Open a streaming connection
-authenticated({http_stream, Url, Params}, State) ->
+authenticated({http_stream, Url, Params}, #state{stream_pid=OldPid}=State) ->
+  p_cleanup_stream(OldPid),
   Provider = State#state.provider,
   Consumer = State#state.consumer,
   AToken = State#state.access_token,
   ASecret = State#state.access_secret,
+  Self = self(),
   Pid = spawn_link(fun() ->
-    oauth_post_stream(Url, Params, Provider, Consumer, AToken, ASecret)
+    oauth_post_stream(Self, Url, Params, Provider, Consumer, AToken, ASecret)
   end),
   {next_state, authenticated, State#state{stream_pid=Pid}};
 
@@ -258,6 +260,13 @@ authenticated(stop_stream, #state{stream_pid=Pid}=State)
   {next_state, authenticated, State#state{stream_pid=undefined}}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% INTERNAL %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+p_cleanup_stream(undefined) -> ok;
+p_cleanup_stream(StreamPid) ->
+  case is_process_alive(StreamPid) of
+    true -> StreamPid ! terminate;
+    false -> ok
+  end.
+
 partition_oauth_params(Signed) ->
   PartitionFn = fun({K, _}) -> lists:prefix("oauth_", K) end,
   lists:partition(PartitionFn, Signed).
@@ -301,8 +310,9 @@ oauth_post(Url, Params, Consumer, Token, TokenSecret) ->
   httpc:request(post, Request, [], []).
 
 
+%% Called as a spawned fun
 %% Params = [{K,V}]
-oauth_post_stream(Url, Params, Provider, Consumer, Token, TokenSecret) ->
+oauth_post_stream(Self, Url, Params, Provider, Consumer, Token, TokenSecret) ->
   lager:info("Using params: ~p", [Params]),
   Signed = oauth:sign("POST", Url, Params, Consumer, Token, TokenSecret),
   {AuthorizationParams, QueryParams} = partition_oauth_params(Signed),
@@ -316,8 +326,10 @@ oauth_post_stream(Url, Params, Provider, Consumer, Token, TokenSecret) ->
   httpc:set_options([{pipeline_timeout, 90000}]),
   case catch httpc:request(post, Request, [], Options) of
     {ok, RequestId} ->
-      lager:info("[~p] Initiate stream handler for RequestId ~p", [?MODULE,RequestId]),
-      ocellus_stream_listener:handle_stream(Provider, RequestId);
+      lager:info("[~p] Initiate stream handler for RequestId ~p", 
+        [?MODULE,RequestId]),
+      OAuth = {Self, Url, Params},
+      ocellus_stream_listener:handle_stream(Provider, RequestId, OAuth);
     {error, Reason} ->
       lager:error("[~p] Unable to connect: ~p", [?MODULE,Reason])
   end.

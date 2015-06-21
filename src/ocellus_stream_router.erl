@@ -55,7 +55,7 @@ p_parse_event(Event,#state{fragment=Fragment}=State) ->
   {Message,NextFragment} = case binary:match(Event, ?NEWLINE) of
     nomatch -> 
       try {no_message, <<Fragment/binary,Event/binary>>}
-      catch _Error:Reason ->
+      catch _Error:_Reason ->
         Msg = "Unable to extend fragment comprising ~p and ~p",
         lager:warning(Msg,[Fragment,Event]),
         {no_message, Event}
@@ -63,7 +63,7 @@ p_parse_event(Event,#state{fragment=Fragment}=State) ->
     _PosLen ->
       [H,T] = binary:split(Event,?NEWLINE),
       try {<<Fragment/binary,H/binary>>, T}
-      catch _Error:Reason ->
+      catch _Error:_Reason ->
         Msg = "Unable to complete fragment comprising ~p and ~p",
         lager:warning(Msg,[Fragment,H]),
         {H, T}
@@ -74,6 +74,7 @@ p_parse_event(Event,#state{fragment=Fragment}=State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%% GEN_EVENT CALLBACKS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Table structure is {{Provider,Channel}, Subscriber}
 init({Provider, Callback}) ->
+  process_flag(trap_exit,true),
   TableId = ets:new(channels, [bag, protected, {keypos,1}]),
   {ok, #state{provider=Provider, channel_table=TableId, callback=Callback}}.
 
@@ -123,7 +124,9 @@ handle_event(Event, State) ->
 
 handle_call(_Request, State) -> {ok, ok, State}.
 
-handle_info(_Info, State) -> {ok, State}.
+handle_info(Info, State) ->
+  lager:info("Info: ~p", [Info]),
+  {ok, State}.
 
 code_change(_OldVsn, State, _Extra) -> {ok, State}.
 

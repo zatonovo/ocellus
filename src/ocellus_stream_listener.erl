@@ -1,26 +1,26 @@
 %% This is meant to be spawned by the gen_oauth process as a listener
 %% for a streaming connection.
 -module(ocellus_stream_listener).
--export([handle_stream/2]).
+-export([handle_stream/3]).
 
 
 
--spec handle_stream(term(), term()) -> {ok, terminate} | {ok, stream_end} | {error, term()}.
-handle_stream(Provider, RequestId) ->
+-spec handle_stream(atom(), term(), term()) -> {ok, terminate} | {ok, stream_end} | {error, term()}.
+handle_stream(Provider, RequestId, OAuth) ->
   receive
     % stream opened
     {http, {RequestId, stream_start, _Headers}} ->
-      handle_stream(Provider, RequestId);
+      handle_stream(Provider, RequestId, OAuth);
 
     % stream received data
     {http, {RequestId, stream, Data}} ->
       spawn(fun() -> ocellus_stream_router:stream_event(Provider, Data) end),
-      handle_stream(Provider, RequestId);
+      handle_stream(Provider, RequestId, OAuth);
 
     % stream closed
     {http, {RequestId, stream_end, _Headers}} ->
       lager:info("[~p] Stream closed for ~p. Reconnect", [?MODULE,RequestId]),
-      dragonfly_listener:restart(),
+      p_restart(OAuth),
       {ok, stream_end};
 
     % connected but received error cod
@@ -48,3 +48,5 @@ handle_stream(Provider, RequestId) ->
       {ok, terminate}
   end.
 
+p_restart({Pid, Url, Params}) ->
+  gen_oauth:http_stream(Pid, Url, Params).

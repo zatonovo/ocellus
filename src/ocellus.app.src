@@ -5,7 +5,18 @@
   {registered, []},
   {applications, [
                   kernel,
-                  stdlib
+                  stdlib,
+                  syntax_tools,
+                  compiler,
+                  crypto,
+                  asn1,
+                  public_key,
+                  ssl,
+                  inets,
+                  goldrush,
+                  oauth,
+                  lager,
+                  jiffy
                  ]},
   {mod, { ocellus_app, []}},
   {env, []}

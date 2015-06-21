@@ -15,6 +15,12 @@ Getting Started
 You need a Twitter account and sign up for their developer program.
 Create an application and note the consumer token and secret.
 
+From the command line, start ocellus and dependencies the usual way.
+
+```erlang
+application:ensure_all_started(ocellus).
+```
+
 REST API
 --------
 
