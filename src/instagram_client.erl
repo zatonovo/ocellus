@@ -11,14 +11,14 @@
          identity/1,
          set_access_token/2]).
 % Users
--export([get_user/1, get_user/2,
-         get_feed/1, get_feed/2,
+-export([get_user_info/1, get_user_info/2,
+         get_user_timeline/1, get_user_timeline/2,
          get_recent_media/1, get_recent_media/2,
          get_liked/1, get_liked/2,
          search_users/2, search_users/3]).
 % Relationship
--export([get_follows/1,
-         get_followed_by/1,
+-export([get_friends/1,
+         get_followers/1,
          get_requested_by/1,
          get_relationship/2]).
 % Media
@@ -46,9 +46,8 @@
 -define(BASE_API_URL,       "https://api.instagram.com/v1").
 -define(API_URL(Chunks),    lists:flatten([?BASE_API_URL | Chunks])).
 
--define(FEED_URL,                       ?API_URL(["/users/self/feed"])).
--define(FOLLOW_URL,                     ?API_URL(["/users/self/follows"])).
--define(FOLLOWED_BY_URL,                ?API_URL(["/users/self/followed-by"])).
+-define(FRIENDS_URL,                    ?API_URL(["/users/self/follows"])).
+-define(FOLLOWERS_URL,                  ?API_URL(["/users/self/followed-by"])).
 -define(LIKED_URL,                      ?API_URL(["/users/self/media/liked"])).
 -define(MEDIA_URL(MediaId),             ?API_URL(["/media/", MediaId])).
 -define(MEDIA_COMMENTS_URL(MediaId),    ?API_URL(["/media/", MediaId,"/comments"])).
@@ -63,7 +62,8 @@
 -define(TAG_URL(Tag),                   ?API_URL(["/tags/", Tag])).
 -define(TAG_RECENT_MEDIA_URL(Tag),      ?API_URL(["/tags/", Tag, "/media/recent"])).
 -define(TAG_SEARCH_URL,                 ?API_URL(["/tags/search"])).
--define(USER_URL(User),                 ?API_URL(["/users/", User])).
+-define(TIMELINE_URL,                   ?API_URL(["/users/self/feed"])).
+-define(USER_INFO_URL(User),            ?API_URL(["/users/", User])).
 
 %%%===================================================================
 %%% Start/stop API
@@ -123,29 +123,29 @@ get_access_token(ServerRef) ->
 %%%===================================================================
 %%% User endpoints API
 %%%===================================================================
--spec get_user(pid()) ->
+-spec get_user_info(pid()) ->
     {ok, {http_headers(), http_body()}}
   | {error, {http_code(), http_headers(), http_body()}}.
-get_user(ServerRef) ->
-    get_user(ServerRef, "self").
+get_user_info(ServerRef) ->
+    get_user_info(ServerRef, "self").
 
--spec get_user(pid(), string()) ->
+-spec get_user_info(pid(), string()) ->
     {ok, {http_headers(), http_body()}}
   | {error, {http_code(), http_headers(), http_body()}}.
-get_user(ServerRef, User) ->
-    gen_oauth2:http_get(ServerRef, ?USER_URL(User), []).
+get_user_info(ServerRef, User) ->
+    gen_oauth2:http_get(ServerRef, ?USER_INFO_URL(User), []).
 
--spec get_feed(pid()) ->
+-spec get_user_timeline(pid()) ->
     {ok, {http_headers(), http_body()}}
   | {error, {http_code(), http_headers(), http_body()}}.
-get_feed(ServerRef) ->
-    get_feed(ServerRef, []).
+get_user_timeline(ServerRef) ->
+    get_user_timeline(ServerRef, []).
 
--spec get_feed(pid(), [{count, pos_integer()} | {min_id, integer()} | {max_id, integer()}]) ->
+-spec get_user_timeline(pid(), [{count, pos_integer()} | {min_id, integer()} | {max_id, integer()}]) ->
     {ok, {http_headers(), http_body()}}
   | {error, {http_code(), http_headers(), http_body()}}.
-get_feed(ServerRef, UrlParams) ->
-    gen_oauth2:http_get(ServerRef, ?FEED_URL, UrlParams).
+get_user_timeline(ServerRef, UrlParams) ->
+    gen_oauth2:http_get(ServerRef, ?TIMELINE_URL, UrlParams).
 
 -spec get_recent_media(pid()) ->
     {ok, {http_headers(), http_body()}}
@@ -190,17 +190,17 @@ search_users(ServerRef, Query, UrlParams) ->
 %%%===================================================================
 %%% Relationship endpoints API
 %%%===================================================================
--spec get_follows(pid()) ->
+-spec get_friends(pid()) ->
     {ok, {http_headers(), http_body()}}
   | {error, {http_code(), http_headers(), http_body()}}.
-get_follows(ServerRef) ->
-    gen_oauth2:http_get(ServerRef, ?FOLLOW_URL).
+get_friends(ServerRef) ->
+    gen_oauth2:http_get(ServerRef, ?FRIENDS_URL).
 
--spec get_followed_by(pid()) ->
+-spec get_followers(pid()) ->
     {ok, {http_headers(), http_body()}}
   | {error, {http_code(), http_headers(), http_body()}}.
-get_followed_by(ServerRef) ->
-    gen_oauth2:http_get(ServerRef, ?FOLLOWED_BY_URL).
+get_followers(ServerRef) ->
+    gen_oauth2:http_get(ServerRef, ?FOLLOWERS_URL).
 
 -spec get_requested_by(pid()) ->
     {ok, {http_headers(), http_body()}}
