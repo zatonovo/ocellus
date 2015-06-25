@@ -8,8 +8,8 @@
 %% Supervisor callbacks
 -export([init/1]).
 
--define(CHILD(Id, Mod, Type, Args), {Id, {Mod, start_link, Args},
-                                     transient, 5000, Type, [Mod]}).
+-define(CHILD(Mod, Type, Args), {Mod, {Mod, start_link, Args},
+                                 transient, 5000, Type, [Mod]}).
 
 %%%===================================================================
 %%% API functions
@@ -34,4 +34,4 @@ start_child(Name, Client, Opts) when is_atom(Name) ->
 %%%===================================================================
 init([]) ->
     {ok, {{simple_one_for_one, 5, 10},
-          [?CHILD(instagram, instagram, worker, [])]}}.
+          [?CHILD(instagram_client, worker, [])]}}.

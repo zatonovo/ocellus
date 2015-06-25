@@ -13,8 +13,8 @@ init([]) ->
   {ok, {{simple_one_for_one, 3, 60},
   [{?MODULE,
     % No arguments by default. Call supervisor:start_child(Sup, [UserName])
-    {twitter_oauth, start_link, []},
-    temporary, 1000, worker, [twitter_oauth]}
+    {twitter_client, start_link, []},
+    temporary, 1000, worker, [twitter_client]}
     ]}}.
 
 %% Call this to add a user process and begin the oauth handshake for that
@@ -22,8 +22,8 @@ init([]) ->
 %% Flow:
 %% Consumer = oauth_util:consumer_tokens(twitter).
 %% Pid = twitter_sup:add_user("sessionid", Consumer).
-%% {ok, RequestToken} = twitter_oauth:get_request_token(Pid, []).
-%% {ok, AuthUrl} = twitter_oauth:get_authentication_url(Pid, RequestToken).
+%% {ok, RequestToken} = twitter_client:get_request_token(Pid, []).
+%% {ok, AuthUrl} = twitter_client:get_authentication_url(Pid, RequestToken).
 add_user(SessionId, Consumer) ->
   Ref = gen_oauth:server_name(SessionId,twitter),
   case whereis(Ref) of
@@ -35,7 +35,7 @@ add_user(SessionId, Consumer) ->
     Pid -> Pid
   end.
 
-%% Stop user twitter_oauth process. This is only local and does not affect
+%% Stop user twitter_client process. This is only local and does not affect
 %% the persisted sessions.
 stop_user(SessionId) ->
   Ref = gen_oauth:server_name(SessionId,twitter),

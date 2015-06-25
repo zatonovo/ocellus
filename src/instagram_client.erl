@@ -1,4 +1,4 @@
--module(instagram).
+-module(instagram_client).
 -behaviour(gen_oauth2).
 
 -include("gen_oauth2.hrl").

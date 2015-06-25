@@ -41,54 +41,54 @@ end_per_suite(_Config) ->
     ok.
 
 t_start_stop_named_process(_Config) ->
-    {ok, Pid} = instagram:start(t_start_stop_named_process,
-                                ?CLIENT_ID,
-                                ?CLIENT_SECRET,
-                                ?CLIENT_REDIRECT_URL),
+    {ok, Pid} = instagram_client:start(t_start_stop_named_process,
+                                       ?CLIENT_ID,
+                                       ?CLIENT_SECRET,
+                                       ?CLIENT_REDIRECT_URL),
     ok = test_helpers:keep_trying(
            Pid, fun() -> erlang:whereis(t_start_stop_named_process) end,
            10, 10),
-    {ok, t_start_stop_named_process} = instagram:identity(Pid),
-    ok = instagram:stop(Pid),
+    {ok, t_start_stop_named_process} = instagram_client:identity(Pid),
+    ok = instagram_client:stop(Pid),
     ok = test_helpers:keep_trying(
            undefined, fun() -> erlang:whereis(t_start_stop_named_process) end,
            10, 10),
     ok.
 
 t_start_stop_anonymous_process(_Config) ->
-    {ok, Pid} = instagram:start(?CLIENT_ID,
-                                ?CLIENT_SECRET,
-                                ?CLIENT_REDIRECT_URL),
-    {error, no_identity} = instagram:identity(Pid),
-    ok = instagram:stop(Pid),
+    {ok, Pid} = instagram_client:start(?CLIENT_ID,
+                                       ?CLIENT_SECRET,
+                                       ?CLIENT_REDIRECT_URL),
+    {error, no_identity} = instagram_client:identity(Pid),
+    ok = instagram_client:stop(Pid),
     ok.
 
 t_set_get_access_token(_Config) ->
-    {ok, Pid} = instagram:start(?CLIENT_ID,
-                                ?CLIENT_SECRET,
-                                ?CLIENT_REDIRECT_URL),
-    {error, not_authorized} = instagram:get_access_token(Pid),
-    ok = instagram:set_access_token(Pid, ?CLIENT_ACCESS_TOKEN),
-    {ok, ?CLIENT_ACCESS_TOKEN} = instagram:get_access_token(Pid),
-    ok = instagram:stop(Pid),
+    {ok, Pid} = instagram_client:start(?CLIENT_ID,
+                                       ?CLIENT_SECRET,
+                                       ?CLIENT_REDIRECT_URL),
+    {error, not_authorized} = instagram_client:get_access_token(Pid),
+    ok = instagram_client:set_access_token(Pid, ?CLIENT_ACCESS_TOKEN),
+    {ok, ?CLIENT_ACCESS_TOKEN} = instagram_client:get_access_token(Pid),
+    ok = instagram_client:stop(Pid),
     ok.
 
 t_error_start_same_named_process(_Config) ->
-    {ok, Pid} = instagram:start(t_error_start_same_named_process,
-                                ?CLIENT_ID,
-                                ?CLIENT_SECRET,
-                                ?CLIENT_REDIRECT_URL),
-    {error, {already_started, Pid}} = instagram:start(t_error_start_same_named_process,
-                                                      ?CLIENT_ID,
-                                                      ?CLIENT_SECRET,
-                                                      ?CLIENT_REDIRECT_URL),
+    {ok, Pid} = instagram_client:start(t_error_start_same_named_process,
+                                       ?CLIENT_ID,
+                                       ?CLIENT_SECRET,
+                                       ?CLIENT_REDIRECT_URL),
+    {error, {already_started, Pid}} = instagram_client:start(t_error_start_same_named_process,
+                                                             ?CLIENT_ID,
+                                                             ?CLIENT_SECRET,
+                                                             ?CLIENT_REDIRECT_URL),
     ok.
 
 t_error_unauthorized_http_get(_Config) ->
-    {ok, Pid} = instagram:start(?CLIENT_ID,
-                                ?CLIENT_SECRET,
-                                ?CLIENT_REDIRECT_URL),
-    {error, invalid_request} = instagram:get_liked(Pid),
+    {ok, Pid} = instagram_client:start(?CLIENT_ID,
+                                       ?CLIENT_SECRET,
+                                       ?CLIENT_REDIRECT_URL),
+    {error, invalid_request} = instagram_client:get_liked(Pid),
     ok.
 
 t_authorized_http_get(_Config) ->
@@ -98,9 +98,9 @@ t_authorized_http_get(_Config) ->
     Client = gen_oauth2:new_client(?CLIENT_ID, ?CLIENT_SECRET, ?CLIENT_REDIRECT_URL,
                                    ?CLIENT_TOKEN_URL),
     {ok, Pid} = instagram_sup:start_child(Client, [{http_get_fun, HttpGetFn}]),
-    {ok, ?CLIENT_TOKEN_URL} = instagram:get_authorization_url(Pid),
-    ok = instagram:set_access_token(Pid, ?CLIENT_ACCESS_TOKEN),
-    ExpectedResponse = instagram:get_liked(Pid),
+    {ok, ?CLIENT_TOKEN_URL} = instagram_client:get_authorization_url(Pid),
+    ok = instagram_client:set_access_token(Pid, ?CLIENT_ACCESS_TOKEN),
+    ExpectedResponse = instagram_client:get_liked(Pid),
     ok.
 
 t_error_limit_exception_http_get(_Config) ->
@@ -110,7 +110,7 @@ t_error_limit_exception_http_get(_Config) ->
     Client = gen_oauth2:new_client(?CLIENT_ID, ?CLIENT_SECRET, ?CLIENT_REDIRECT_URL,
                                    ?CLIENT_TOKEN_URL),
     {ok, Pid} = instagram_sup:start_child(Client, [{http_get_fun, HttpGetFn}]),
-    {ok, ?CLIENT_TOKEN_URL} = instagram:get_authorization_url(Pid),
-    ok = instagram:set_access_token(Pid, ?CLIENT_ACCESS_TOKEN),
-    ExpectedResponse = instagram:get_liked(Pid),
+    {ok, ?CLIENT_TOKEN_URL} = instagram_client:get_authorization_url(Pid),
+    ok = instagram_client:set_access_token(Pid, ?CLIENT_ACCESS_TOKEN),
+    ExpectedResponse = instagram_client:get_liked(Pid),
     ok.
