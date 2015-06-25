@@ -44,7 +44,7 @@
         "&response_type=token").
 
 -define(BASE_API_URL,       "https://api.instagram.com/v1").
--define(API_URL(Chunks),    ?BASE_API_URL ++ string:join(Chunks, "")).
+-define(API_URL(Chunks),    lists:flatten([?BASE_API_URL | Chunks])).
 
 -define(FEED_URL,                       ?API_URL(["/users/self/feed"])).
 -define(FOLLOW_URL,                     ?API_URL(["/users/self/follows"])).

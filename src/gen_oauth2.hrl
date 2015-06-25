@@ -6,4 +6,5 @@
 -type http_headers()        :: proplists:proplist().
 -type http_body()           :: string().
 -type http_code()           :: pos_integer().
--type options()             :: [{http_get_fun, fun()}].
+-type options()             :: [{http_get_fun, fun()}
+                              | {access_token, string()}].

@@ -1,3 +1,27 @@
+%%%-------------------------------------------------------------------
+%% @doc This is a fsm responsible for establishing authorized oauth2
+%% connections. It has only two states: pending_verification and authenticated.
+%%
+%% Steps to authorize a new user:
+%%
+%% % create new oauth2 client:
+%% Client = gen_oauth2:new_client(ClientId, ClientSecret, RedirectURI,
+%% GetTokenURL).
+%% % start a process
+%% {ok, Pid} = gen_oauth2:start_link(Client).
+%% % get authorization url
+%% {ok, AuthURL} = gen_oauth2:get_authorization_url(Pid).
+%% % set access token
+%% ok = gen_oauth2:set_access_token(Pid, AccessToken).
+%% % client should be in authorized state at this point, and http_get calls
+%% should be possible:
+%% {ok, Response} = gen_oauth2:http_get(Pid, URL).
+%%
+%% If you already have an AccessToken, you can start gen_oauth2 process in
+%% authorized state:
+%% {ok, Pid} = gen_oauth2:start_link(Client, [{access_token, AccessToken}]).
+%% @end
+%%%-------------------------------------------------------------------
 -module(gen_oauth2).
 -behaviour(gen_fsm).
 
@@ -105,11 +129,11 @@ stop(ServerRef) ->
 init([Name, Client, Opts]) ->
     State0 = #state{identity=Name, client=Client},
     State = set_options(State0, Opts),
-    {ok, pending_verification, State};
+    init_state(State);
 init([Client, Opts]) ->
     State0 = #state{client=Client},
     State = set_options(State0, Opts),
-    {ok, pending_verification, State}.
+    init_state(State).
 
 pending_verification({set_access_token, AccessToken}, _From, State) ->
     {reply, ok, authenticated, State#state{access_token=AccessToken}};
@@ -175,4 +199,11 @@ set_options(State, Opts) ->
     lists:foldl(fun do_set_options/2, State, Opts).
 
 do_set_options({http_get_fun, Fun}, State) ->
-    State#state{http_get_fun=Fun}.
+    State#state{http_get_fun=Fun};
+do_set_options({access_token, AccessToken}, State) ->
+    State#state{access_token=AccessToken}.
+
+init_state(#state{access_token=undefined}=State) ->
+    {ok, pending_verification, State};
+init_state(State) ->
+    {ok, authenticated, State}.

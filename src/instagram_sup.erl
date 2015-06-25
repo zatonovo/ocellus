@@ -34,4 +34,4 @@ start_child(Name, Client, Opts) when is_atom(Name) ->
 %%%===================================================================
 init([]) ->
     {ok, {{simple_one_for_one, 5, 10},
-          [?CHILD(instagram, instagram_oauth, worker, [])]}}.
+          [?CHILD(instagram, instagram, worker, [])]}}.
