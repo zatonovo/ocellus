@@ -180,7 +180,8 @@ filter_stream(ServerRef, SearchQuery) ->
 
 filter_stream(ServerRef, SearchQuery, Params) ->
   Url = "https://stream.twitter.com/1.1/statuses/filter.json",
-  gen_oauth:http_stream(ServerRef, Url, [{"track",SearchQuery} | Params]).
+  {ok, StreamFun} = gen_oauth:http_stream_fun(ServerRef, Url, [{"track",SearchQuery} | Params]),
+  ocellus_stream:start_stream(StreamFun, twitter).
 
 
 init(_Args) ->

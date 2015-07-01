@@ -25,6 +25,7 @@ start_link() ->
 
 init([]) ->
   StreamRouter = ?CHILD(ocellus_stream_router, worker),
+  StreamSup = ?CHILD(ocellus_stream_sup, supervisor),
   TwitterSup = ?CHILD(twitter_sup, supervisor),
-  {ok, { {one_for_one, 5, 10}, [StreamRouter, TwitterSup]} }.
+  {ok, { {one_for_one, 5, 10}, [StreamRouter, StreamSup, TwitterSup]} }.
 
