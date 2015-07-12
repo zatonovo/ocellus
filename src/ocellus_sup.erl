@@ -1,6 +1,4 @@
-
 -module(ocellus_sup).
-
 -behaviour(supervisor).
 
 %% API
@@ -17,15 +15,16 @@
 %% ===================================================================
 
 start_link() ->
-  supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 %% ===================================================================
 %% Supervisor callbacks
 %% ===================================================================
 
 init([]) ->
-  StreamRouter = ?CHILD(ocellus_stream_router, worker),
-  StreamSup = ?CHILD(ocellus_stream_sup, supervisor),
-  TwitterSup = ?CHILD(twitter_sup, supervisor),
-  {ok, { {one_for_one, 5, 10}, [StreamRouter, StreamSup, TwitterSup]} }.
-
+    StreamRouter = ?CHILD(ocellus_stream_router, worker),
+    StreamSup    = ?CHILD(ocellus_stream_sup, supervisor),
+    TwitterSup   = ?CHILD(twitter_sup, supervisor),
+    InstagramSup = ?CHILD(instagram_sup, supervisor),
+    {ok, { {one_for_one, 5, 10},
+           [StreamRouter, StreamSup, TwitterSup, InstagramSup]} }.

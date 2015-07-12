@@ -1,6 +1,8 @@
 PROJECT=ocellus
 REBAR=rebar
 
+.PHONY: test
+
 all:
 	@$(REBAR) get-deps compile
 
@@ -11,6 +13,9 @@ test:
 	@rm -rf .eunit
 	@mkdir -p .eunit
 	@$(REBAR) skip_deps=true eunit
+
+ct-test: all
+	@$(REBAR) ct skip_deps=true
 
 clean:
 	@$(REBAR) clean

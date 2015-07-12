@@ -28,12 +28,12 @@ you can use the below method.
 ```erlang
 Params = [{"track","erlang"}].
 Consumer = {"Token", "Secret", hmac_sha1}.
-{ok, Pid} = twitter_oauth:start_link().
-twitter_oauth:set_consumer_key(Pid, Consumer).
-{ok, Token} = twitter_oauth:get_request_token(Pid, Params).
-AuthorizeUrl = twitter_oauth:get_authorization_url(Pid, Token).
-Access = twitter_oauth:get_access_token(Pid, "Verifier PIN").
-Tweets = twitter_oauth:search_tweets(Pid, "erlang").
+{ok, Pid} = twitter_client:start_link().
+twitter_client:set_consumer_key(Pid, Consumer).
+{ok, Token} = twitter_client:get_request_token(Pid, Params).
+AuthorizeUrl = twitter_client:get_authorization_url(Pid, Token).
+Access = twitter_client:get_access_token(Pid, "Verifier PIN").
+Tweets = twitter_client:search_tweets(Pid, "erlang").
 ```
 
 ### Using existing access tokens
@@ -47,10 +47,10 @@ them directly. This is also useful for an "app-only" style authentication.
 ```erlang
 Consumer = {"Token", "Secret", hmac_sha1}.
 Access = {"Token", "Secret"}.
-{ok, Pid} = twitter_oauth:start_link().
-twitter_oauth:set_consumer_key(Pid, Consumer).
-twitter_oauth:set_access_token(Pid, Access).
-twitter_oauth:search_tweets(Pid, Query).
+{ok, Pid} = twitter_client:start_link().
+twitter_client:set_consumer_key(Pid, Consumer).
+twitter_client:set_access_token(Pid, Access).
+twitter_client:search_tweets(Pid, Query).
 ```
 
 Streaming API
@@ -63,8 +63,8 @@ tweet that's pushed to ocellus.
 Consumer = {"Token", "Secret", hmac_sha1}.
 Access = {"Token", "Secret"}.
 Query = "".
-{ok, Pid} = twitter_oauth:start_link(Consumer).
-twitter_oauth:set_access_token(Pid, Access).
+{ok, Pid} = twitter_client:start_link(Consumer).
+twitter_client:set_access_token(Pid, Access).
 Callback =  fun(Pid, Provider, Json) ->
   Data = json_util:decode(Json),
   Tweet = proplists:get_value(<<"text">>, Data),
@@ -81,7 +81,7 @@ ocellus_stream_router:add_provider(twitter, Callback).
 ocellus_stream_router:register(self(), twitter, anonymous_channel).
 
 % Initiate the stream
-twitter_oauth:filter_stream(Pid, Query).
+twitter_client:filter_stream(Pid, Query).
 ```
 
 Future

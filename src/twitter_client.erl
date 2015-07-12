@@ -1,6 +1,6 @@
 %% Provides an implementation of the Twitter API
 %% @author Brian Lee Yung Rowe
--module(twitter_oauth).
+-module(twitter_client).
 -behaviour(gen_oauth).
 -export([start_link/1, start_link/2,
   get_favorites/2, get_favorites/3,
@@ -95,7 +95,7 @@ get_rate_limits(SessionId, Resources) ->
 
 
 
-% twitter_oauth:get_user_info(SessionId, "cartesianfaith"),
+% twitter_client:get_user_info(SessionId, "cartesianfaith"),
 -spec get_user_info(bitstring(), bitstring()) -> any().
 get_user_info(SessionId, ScreenName) ->
   get_user_info(SessionId, ScreenName, []).
